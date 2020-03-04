@@ -6,7 +6,7 @@ ESP8266 WiFi to serial interface, built to connect to a Viessmann Vitotronic hea
 1. Install the Arduino IDE plus the 8266 package following the instructions at https://github.com/esp8266/Arduino#installing-with-boards-manager
 2. Open, compile and upload the *vitotronic_interface.ino* sketch to your ESP8266.
 or
-3. Flash the precomiled binary in freom the releases directory.
+3. Flash the precomiled binary in from the releases directory.
 
 ## Setting Up the *Optolink* Hardware
 * Wire up the ESP8266 and power supply.
