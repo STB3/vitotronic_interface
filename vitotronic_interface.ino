@@ -1,20 +1,53 @@
-// Import required libraries
+/*
+ * ESP8266 sketch for the Viessmann Optolink WLAN interface.
+ * Sketch establshes an option for connection to a WLAN router.
+ * If connected, the data from an Optolink to the router and heating can be controlled via fhem.
+ *
+ * Created by renemt <renemt@forum.fhem.de>
+ *
+ * REVISION HISTORY
+ * Hardware (optolink adapter)
+ * Ver. 1.x:
+ * - GPIO0 for 1-wire
+ * - GPIO2 for debug messages
+ * - GPIO12 for config
+ * - 512k RAM/64k SPIFFS
+ * Ver. 2.x:
+ * - GPIO0 for 1-wire
+ * - GPIO2 for config (or for debug messages alternatively)
+ * - 1M RAM/64 kSPIFFS (in case of black ESP8266 ESP01 modules)
+ * 
+ * Software
+ * Version 1.0 - renemt see https://github.com/rene-mt/vitotronic-interface-8266/blob/master/vitotronic-interface-8266.ino
+ * Version 1.1 - Peter Mühlbeyer
+ * - added some comments for better understanding
+ * - debug output disabled for default (can be switched on again)
+ */
+
+// import required libraries, ESP8266 libraries >2.1.0 are required
 #include <ESP8266WiFi.h>
 #include <FS.h>
 #include <ESP8266WebServer.h>
 
-//GPIO pin triggering setup interrupt for re-configuring the server
-#define SETUP_INTERRUPT_PIN 12
+// define sketch version
+#define SV "1.1"
 
-//SSID and password for the configuration WiFi network established bei the ESP in setup mode
+// GPIO pin triggering setup interrupt for re-configuring the server
+//#define SETUP_INTERRUPT_PIN 12    //for optolink adapter v1.x
+#define SETUP_INTERRUPT_PIN 2    //for optolink adapter v2.x
+
+// SSID and password for the configuration WiFi network established bei the ESP in setup mode
 #define SETUP_AP_SSID "vitotronic-interface"
 #define SETUP_AP_PASSWORD "vitotronic"
 
-//setup mode flag, 1 when in setup mode, 0 otherwise
+// define, if debug output via serial interface will be enabled (true) or not (false)
+#define DEBUG_SERIAL1 false
+
+// setup mode flag, 1 when in setup mode, 0 otherwise
 uint8_t _setupMode = 0;
 
 /*
-   Config file layout - one entry per line, seven lines overall, terminated by '\n':
+   Config file layout - one entry per line, eight lines overall, terminated by '\n':
     <ssid>
     <password>
     <port>
@@ -23,6 +56,7 @@ uint8_t _setupMode = 0;
     <gateway IP - or empty line>
     <subnet mask - or empty line>
 */
+
 //path+filename of the WiFi configuration file in the ESP's internal file system.
 const char* _configFile = "/config/config.txt";
 
@@ -52,12 +86,12 @@ const char* _htmlConfigTemplate =
         "</p>" \
         "<h3>Static IP settings</h3>" \
         "<p>" \
-          "<div>If you want to assing a static IP address fill out the following information. All addresses have to by given in IPv4 format (XXX.XXX.XXX.XXX)." \
+          "<div>If you want to assing a static IP address fill out the following information. All addresses have to by given in IPv4 format (xxx.xxx.xxx.xxx). <br/>" \
           "Leave the fields empty to rely on DHCP to obtain an IP address.</div>" \
           "<label for=\"" FIELD_IP "\">Static IP:</label><input type=\"text\" name=\"" FIELD_IP "\" pattern=\"^[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+$\" /><br/>" \
           "<label for=\"" FIELD_DNS "\">DNS Server:</label><input type=\"text\" name=\"" FIELD_DNS "\" pattern=\"^[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+$\" /><br/>" \
           "<label for=\"" FIELD_GATEWAY "\">Gateway:</label><input type=\"text\" name=\"" FIELD_GATEWAY "\" pattern=\"^[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+$\" /><br/>" \
-          "<label for=\"" FIELD_SUBNET "\">Subnet mask:</label><input type=\"text\" name=\"" FIELD_SUBNET "\" pattern=\"^[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+$\" /><br/>" \
+          "<label for=\"" FIELD_SUBNET "\">Subnet mask:</label><input type=\"text\" name=\"" FIELD_SUBNET "\" pattern=\"^[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+$\" /><br/>"
         "</p>" \
         "<h3>Server Port</h3>" \
         "<p>" \
@@ -79,7 +113,7 @@ const char* _htmlSuccessTemplate =
     "</head>" \
     "<body>" \
       "<h1>Vitotronic WiFi Interface</h1>" \
-      "<h2>Configuration Saved</h2>" \
+      "<h2>Configuration saved</h2>" \
       "<p>" \
         "The configuration has been successfully saved to the adapter:<br/><br/>" \
         "- SSID: %%ssid<br/>" \
@@ -88,8 +122,8 @@ const char* _htmlSuccessTemplate =
         "- Static IP: %%ip<br/>" \
         "- DNS server: %%dns<br/>" \
         "- Gateway: %%gateway<br/>" \
-        "- Subnet mask: %%subnet<br/>" \
-        "The adapter will reboot now and connect to the specified WiFi network. In case of a successful connection the <em>vitotronic-interface</em> network will be gone. " \
+        "- Subnet mask: %%subnet<br/><br/>" \
+        "The adapter will reboot now and connect to the specified WiFi network. In case of a successful connection the <em>vitotronic-interface</em> network will be gone. <br/>" \
         "<strong>If no connection is possible, e.g. because the password is wrong or the network is not available, the adapter will return to setup mode again.</strong>" \
       "</p>" \
       "<p>" \
@@ -105,25 +139,33 @@ WiFiServer* server = NULL;
 WiFiClient serverClient;
 
 //helper function to remove trailing CR (0x0d) from strings read from config file
-String removeTrailingCR(String input){
+String removeTrailingCR(String input)
+{
   if (!input)
     return String();
-  if (input.charAt(input.length()-1) == 0x0d){
+  if (input.charAt(input.length()-1) == 0x0d)
+  {
     input.remove(input.length()-1);
   }
   return input;
 }
 
-void setup() {
-  Serial1.begin(115200); // User Serial1 (GPIO2) as debug output (TX), with 115200,N,1
+// setup of the program
+void setup()
+{
+  Serial1.begin(115200); // serial1 (GPIO2) as debug output (TX), with 115200,N,1
+  // uncomment next line to enable debugging, not for productive use
   //Serial1.setDebugOutput(true);
-  Serial1.println("\nVitotronic WiFi Interface\n");
+  Serial1.setDebugOutput(DEBUG_SERIAL1);
+  //Serial1.println("\nVitotronic WiFi Interface\n");
+  Serial1.printf("\nVitotronic WiFi Interface v'%s'\n\n", SV);
   yield();
 
   //try to read config file from internal file system
   SPIFFS.begin();
   File configFile = SPIFFS.open(_configFile, "r");
-  if (configFile) {
+  if (configFile)
+  {
     Serial1.println("Using existing WiFi config to connect");
 
     String ssid = removeTrailingCR(configFile.readStringUntil('\n'));
@@ -135,7 +177,7 @@ void setup() {
         || !port || port.length() == 0)
     {
       //reset & return to setup mode if minium configuration data is missing
-      Serial1.println("Minimum configuration data is missing (ssid, port) - resetting to setup mode.");
+      Serial1.println("Minimum configuration data is missing (ssid, port) - resetting to setup mode");
       SPIFFS.remove(_configFile);
 
       yield();
@@ -167,22 +209,25 @@ void setup() {
       WiFi.config(IPAddress().fromString(ip), IPAddress().fromString(dns), IPAddress().fromString(gateway), IPAddress().fromString(subnet));
       yield();
     }
-    
+
     Serial1.printf("\nConnecting to WiFi network '%s' password: '", ssid.c_str());
-    for (int i=0; i<password.length(); i++){
+    for (int i=0; i<password.length(); i++)
+    {
       Serial1.print("*");
     }
     Serial1.print("'");
 
     uint8_t wifiAttempts = 0;
     WiFi.begin(ssid.c_str(), password.c_str());
-    while (WiFi.status() != WL_CONNECTED && wifiAttempts++ < 20) {
+    while (WiFi.status() != WL_CONNECTED && wifiAttempts++ < 40)
+    {
       Serial1.print('.');
       delay(1000);
     }
-    if (wifiAttempts == 21) {
+    if (wifiAttempts == 41)
+    {
       Serial1.printf("\n\nCould not connect to WiFi network '%s'.\n", ssid.c_str());
-      Serial1.println("Deleting configuration and resetting ESP to return to configuration mode...");
+      Serial1.println("Deleting configuration and resetting ESP to return to configuration mode");
       SPIFFS.remove(_configFile);
       yield();
       ESP.reset();
@@ -191,14 +236,15 @@ void setup() {
     Serial1.printf("\n\nReady! Server available at %s:%s\n", WiFi.localIP().toString().c_str(), port.c_str());
 
     Serial.begin(4800, SERIAL_8E2); // Vitotronic connection runs at 4800,E,2
-    Serial1.println("Serial port to Vitotronic opened at 4800bps, 8E2");
+    Serial1.println("Serial port to Vitotronic opened at 4800 bps, 8E2");
 
     server = new WiFiServer(port.toInt());
     server->begin();
   }
-  else {
+  else
+  {
     //start ESP in access point mode and provide a HTTP server at port 80 to handle the configuration page.
-    Serial1.println("No WiFi config exists, switching to setup mode.");
+    Serial1.println("No WiFi config exists, switching to setup mode");
     WiFi.mode(WIFI_AP);
     WiFi.softAP(SETUP_AP_SSID, SETUP_AP_PASSWORD);
 
@@ -208,7 +254,7 @@ void setup() {
     _setupServer->onNotFound(handleRoot);
     _setupServer->begin();
 
-    Serial1.println("WiFi access point with SSID \"" SETUP_AP_SSID "\" opened.");
+    Serial1.println("WiFi access point with SSID \"" SETUP_AP_SSID "\" opened");
     Serial1.printf("Configuration web server started at %s:80\n\n", WiFi.softAPIP().toString().c_str());
 
     _setupMode = 1;
@@ -220,17 +266,22 @@ void setup() {
   Serial1.printf("Interrupt for re-entering setup mode attached to GPIO%d\n\n", SETUP_INTERRUPT_PIN); 
 }
 
-void wifiSerialLoop() {
+// wifiSerialLoop ???
+void wifiSerialLoop()
+{
   uint8_t i;
   //check if there is a new client trying to connect
-  if (server && server->hasClient()) {
+  if (server && server->hasClient())
+  {
     //check, if no client is already connected
-    if (!serverClient || !serverClient.connected()) {
+    if (!serverClient || !serverClient.connected())
+    {
       if (serverClient) serverClient.stop();
       serverClient = server->available();
-      Serial1.println("New client connected.\n");
+      Serial1.println("New client connected\n");
     }
-    else {
+    else
+    {
       //reject additional connection requests.
       WiFiClient serverClient = server->available();
       serverClient.stop();
@@ -240,9 +291,11 @@ void wifiSerialLoop() {
   yield();
 
   //check client for data
-  if (serverClient && serverClient.connected()) {
+  if (serverClient && serverClient.connected())
+  {
     size_t len = serverClient.available();
-    if (len) {
+    if (len)
+    {
       uint8_t sbuf[len];
       serverClient.read(sbuf, len);
 
@@ -252,9 +305,10 @@ void wifiSerialLoop() {
       yield();
 
       // Debug output received WiFi data to Serial1
-      Serial1.println();
+      //Serial1.println();
       Serial1.print("WiFi: ");
-      for (uint8_t n = 0; n < len; n++) {
+      for (uint8_t n = 0; n < len; n++)
+      {
         Serial1.print(sbuf[n], HEX);
       }
       Serial1.println();
@@ -264,42 +318,52 @@ void wifiSerialLoop() {
   yield();
 
   //check UART for data
-  if (Serial.available()) {
+  if (Serial.available())
+  {
     size_t len = Serial.available();
     uint8_t sbuf[len];
     Serial.readBytes(sbuf, len);
 
     //push UART data to connected WiFi client
-    if (serverClient && serverClient.connected()) {
+    if (serverClient && serverClient.connected())
+    {
       serverClient.write(sbuf, len);
     }
 
     yield();
 
     // Debug output received Serial data to Serial1
-    Serial1.println();
+    //Serial1.println();
     Serial1.print("Serial: ");
-    for (uint8_t n = 0; n < len; n++) {
-      Serial1.printf("%02x,", sbuf[n]);
+    for (uint8_t n = 0; n < len; n++)
+    {
+      Serial1.printf("%02x ", sbuf[n]);
     }
     Serial1.println();
   }
 }
 
-void handleRoot() {
-  if (_setupServer) {
+// handleRoot: goes to setup page
+void handleRoot()
+{
+  if (_setupServer)
+  {
     _setupServer->send(200, "text/html", _htmlConfigTemplate);
   }
 }
 
-void handleUpdate() {
+// handleUpdate: ???
+void handleUpdate()
+{
   Serial1.println("handleUpdate()");
-  if (!_setupServer) {
-    Serial1.println("_setupServer is NULL, exiting.");
+  if (!_setupServer)
+  {
+    Serial1.println("_setupServer is NULL, exiting");
     return;
   }
-  if (_setupServer->uri() != "/update") {
-    Serial1.printf("URI is '%s', which does not match expected URI '/update', exiting.\n", _setupServer->uri().c_str());
+  if (_setupServer->uri() != "/update")
+  {
+    Serial1.printf("URI is '%s', which does not match expected URI '/update', exiting\n", _setupServer->uri().c_str());
     return;
   }
 
@@ -314,7 +378,8 @@ void handleUpdate() {
   Serial1.println("Submitted parameters:");
   Serial1.printf("SSID: '%s'\n", ssid.c_str());
   Serial1.print("Password: '");
-  for (int i=0; i < password.length(); i++) {
+  for (int i=0; i < password.length(); i++)
+  {
     Serial1.print('*');
   }
   Serial1.println("'");
@@ -325,15 +390,17 @@ void handleUpdate() {
   Serial1.printf("Subnet: '%s'\n", subnet.c_str());
 
   // check if mandatory parameters have been set
-  if (ssid.length() == 0 || port.length() == 0) {
-    Serial1.println("Missing SSID or Port parameter!");
+  if (ssid.length() == 0 || port.length() == 0)
+  {
+    Serial1.println("Missing SSID or port parameter!");
     handleRoot();
     return;
   }
 
   //for static IP configuration: check if all parameters have been set
   if (ip.length() > 0 || dns.length() > 0 || gateway.length() > 0 || subnet.length() > 0 &&
-      (ip.length() == 0 || dns.length() == 0 || gateway.length() == 0 || subnet.length() == 0)) {
+      (ip.length() == 0 || dns.length() == 0 || gateway.length() == 0 || subnet.length() == 0))
+  {
     Serial1.println("Missing static IP parameters!");
     handleRoot();
     return;
@@ -356,7 +423,8 @@ void handleUpdate() {
   yield();
   
   String maskedPassword = "";
-  for (int i=0; i<password.length(); i++){
+  for (int i=0; i<password.length(); i++)
+  {
     maskedPassword+="*";
   }
 
@@ -367,26 +435,30 @@ void handleUpdate() {
   htmlSuccess.replace("%%ip", ip);
   htmlSuccess.replace("%%dns", dns);
   htmlSuccess.replace("%%gateway", gateway);
-  htmlSuccess.replace("%%subnet", subnet),
+  htmlSuccess.replace("%%subnet", subnet);
   
   //leave setup mode and restart with existing configuration
   _setupServer->send(200, "text/html", htmlSuccess);
   
-  Serial1.println("Config saved, resetting ESP...");
+  Serial1.println("Config saved, resetting ESP8266");
   delay(10);
   ESP.reset();
 }
 
-void setupInterrupt() {
+// SetupInterrupt: goes to config in case button has been pushed
+void setupInterrupt()
+{
   //if the setup button has been pushed delete the existing configuration and reset the ESP to enter setup mode again
-  Serial1.println("Reset button pressed, deleting existing configuration...");
+  Serial1.println("Reset button pressed, deleting existing configuration");
   SPIFFS.begin();
   SPIFFS.remove(_configFile);
   yield();
   ESP.reset();
 }
 
-void loop() {
+// main loop, runs until infinity
+void loop()
+{
   if (!_setupMode)
     wifiSerialLoop();
   else if (_setupServer)
