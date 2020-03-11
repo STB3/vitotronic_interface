@@ -2,7 +2,7 @@
 
 ESP8266 WiFi to serial interface, built to connect to a Viessmann Vitotronic heating control. The heating control is accessed by using an *Optolink*, according to the instructions in the [OpenV wiki](https://github.com/openv/openv/wiki/Adapter-Eigenbau) and made available as TCP/telnet server in the WiFi network. The communication bewteen the ESP8266 and the heating (via the *Optolink*) runs at 4800 bps, 8 bits, even parity, 2 stop bits.
 
-## Changelog optolink hardware
+## Changelog *Optolink* hardware
 ### v1.x:
  - ~~GPIO0 for 1-wire~~ don't use as the level shifter is not working
  - GPIO2 for debug messages
@@ -11,7 +11,7 @@ ESP8266 WiFi to serial interface, built to connect to a Viessmann Vitotronic hea
 ### v2.x:
  - GPIO0 for 1-wire (only from v2.1 onwards)
  - GPIO2 for config (or for debug messages alternatively)
- - 1M RAM/64 k SPIFFS (in case of black ESP8266-ESP01 modules)
+ - 1M RAM/64k SPIFFS (in case of black ESP8266-ESP01 modules)
 
 ## Changelog firmware
 ### v1.0:
@@ -27,12 +27,12 @@ Initial version by renemt.
 or
 3. Flash the precomiled binary in from the releases directory.
 
-## Setting up the *Optolink* Hardware
+## Setting up the *Optolink* hardware
 * Wire up the ESP8266 and power supply.
 * Connect the *Optolink* to the heating, connect *IN/RX* with the ESP8266 *RX* line and *OUT/TX* with the ESP8266 *TX* line, as well as *VCC* and *GND* to 3.3V and Ground.
 * If you want to retrieve debugging output, connnect a serial port's *RX* line to *GPIO2* of the ESP8266 at 115200 bps, 8N1. Don't forget to connect *GND* of the port as well to *GND* of the ESP8266. Works like charm with an FTDI USB-to-serial adapter.
 
-## Configuring the Adapter
+## Configuring the adapter
 As long as the ESP of the adapter is not configured for connecting to a WiFi network it will provide an own WPA2-secured WiFi access point for configuration. To set up the adapter,
 * Scan your WiFi environment for the SSID *"vitotronic-interface"*.
 * Connect to this network, using the password *"vitotronic"*.
