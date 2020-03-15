@@ -17,9 +17,13 @@ ESP8266 WiFi to serial interface, built to connect to a Viessmann Vitotronic hea
 ### v1.0:
 Initial version by renemt.
 
-### v1.1:
+### v1.1 (PeMue):
 - added some comments for better understanding
 - debug output disabled for default (can be switched on again)
+
+### v1.2 (PeMue):
+- added parameter timeout to ensure a proper connection to the router after reboot (e.g. in case of power loss)
+- changed default port from 8888 to 81 (like in Lacrosse GateWay)
 
 ## Flashing the firmware
 1. Install the Arduino IDE plus the 8266 package following the instructions at https://github.com/esp8266/Arduino#installing-with-boards-manager
@@ -46,6 +50,8 @@ As long as the ESP of the adapter is not configured for connecting to a WiFi net
     * **Gateway** address
     * **Subnet Mask**
   * The **Port** at which the adapter listens for an incoming connection (mandatory)
-* Press "Submit" afterwards. The adapter will save the configuration, restart and connect to the given WiFi network. Afterwards the server will be reachable in the network at the IP (DHCP or static) and specified port. The server's IP is also pingable. **Important notice:** Some ESP8266 modules need a "hard reset" to be able to connect to the new WiFi network. Therefore it is recommended to interrupt the power supply for a short time after the new configuration has been submitted. If the connection was successlful, the *vitotronic-interface* network will be gone and the adapter should be pingable in the specified network.
+  * A **Timeout** value (in s) which the adapter should wait after reboot to re-establish WLAN connection (mandatory).
+* Press "Submit" afterwards. The adapter will save the configuration, restart and connect to the given WiFi network. Afterwards the server will be reachable in the network at the IP (DHCP or static) and specified port. The server's IP is also pingable.
+**Important notice:** Some ESP8266 modules need a "hard reset" to be able to connect to the new WiFi network. Therefore it is recommended to interrupt the power supply for a short time after the new configuration has been submitted. If the connection was successlful, the *vitotronic-interface* network will be gone and the adapter should be pingable in the specified network.
 
-To re-configure the adapter, connect *GPIO12* (or *GPIO2*) to *GND* for a short time (e.g. by a pushbutton). Thus, the existing configuration will be deleted and the adapter will enter setup mode again (see above).
+To re-configure the adapter, connect *GPIO12* (hardware v1.x) (or *GPIO2* (hardware v2.x)) to *GND* for a short time (e.g. by a pushbutton). Thus, the existing configuration will be deleted and the adapter will enter setup mode again (see above).

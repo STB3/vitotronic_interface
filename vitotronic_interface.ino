@@ -22,6 +22,9 @@
  * Version 1.1 - Peter Mühlbeyer
  * - added some comments for better understanding
  * - debug output disabled for default (can be switched on again)
+ * Version 1.2 - Peter Mühlbeyer
+ * - added parameter timeout to ensure a proper connection to the router after reboot (e.g. in case of power loss)
+ * - changed default port from 8888 to 81 (like in LaCrosse gateway)
  */
 
 // import required libraries, ESP8266 libraries >2.1.0 are required
@@ -30,7 +33,7 @@
 #include <ESP8266WebServer.h>
 
 // define sketch version
-#define SV "1.1"
+#define SV "1.2"
 
 // GPIO pin triggering setup interrupt for re-configuring the server
 //#define SETUP_INTERRUPT_PIN 12    //for optolink adapter v1.x
@@ -55,6 +58,7 @@ uint8_t _setupMode = 0;
     <dnsServer IP - or empty line>
     <gateway IP - or empty line>
     <subnet mask - or empty line>
+    <timeout>
 */
 
 //path+filename of the WiFi configuration file in the ESP's internal file system.
@@ -67,6 +71,7 @@ const char* _configFile = "/config/config.txt";
 #define FIELD_DNS "dns"
 #define FIELD_GATEWAY "gateway"
 #define FIELD_SUBNET "subnet"
+#define FIELD_TIMEOUT "timeout"
 
 const char* _htmlConfigTemplate =
   "<html>" \
@@ -96,7 +101,12 @@ const char* _htmlConfigTemplate =
         "<h3>Server Port</h3>" \
         "<p>" \
           "<div>The Vitotronic WiFi Interface will listen at the following port for incoming telnet connections:</div>" \
-          "<label for=\"" FIELD_PORT "\">Port (*):</label><input type=\"number\" name=\"" FIELD_PORT "\" value=\"8888\" required />" \
+          "<label for=\"" FIELD_PORT "\">Port (*):</label><input type=\"number\" name=\"" FIELD_PORT "\" value=\"81\" required />" \
+        "</p>" \
+        "<h3>Timeout</h3>" \
+        "<p>" \
+          "<div>The Vitotronic WiFi Interface will try to connect after <timeout> s after the reboot of the router:</div>" \
+          "<label for=\"" FIELD_TIMEOUT "\">Timeout (*):</label><input type=\"number\" name=\"" FIELD_TIMEOUT "\" value=\"60\" required />" \
         "</p>" \
         "<div>" \
           "<button type=\"reset\">Reset</button>&nbsp;" \
@@ -123,6 +133,7 @@ const char* _htmlSuccessTemplate =
         "- DNS server: %%dns<br/>" \
         "- Gateway: %%gateway<br/>" \
         "- Subnet mask: %%subnet<br/><br/>" \
+        "- Timeout: %%timeout<br/>" \
         "The adapter will reboot now and connect to the specified WiFi network. In case of a successful connection the <em>vitotronic-interface</em> network will be gone. <br/>" \
         "<strong>If no connection is possible, e.g. because the password is wrong or the network is not available, the adapter will return to setup mode again.</strong>" \
       "</p>" \
@@ -189,6 +200,7 @@ void setup()
     String dns = removeTrailingCR(configFile.readStringUntil('\n'));
     String gateway = removeTrailingCR(configFile.readStringUntil('\n'));
     String subnet = removeTrailingCR(configFile.readStringUntil('\n'));
+    String timeout = removeTrailingCR(configFile.readStringUntil('\n'));
 
     configFile.close();
 
@@ -217,12 +229,19 @@ void setup()
     }
     Serial1.print("'");
 
+    Serial1.printf("\nUsing timeout of '%s' s for reboot of router in case of power loss.'", timeout.c_str());
+
     uint8_t wifiAttempts = 0;
     WiFi.begin(ssid.c_str(), password.c_str());
     while (WiFi.status() != WL_CONNECTED && wifiAttempts++ < 40)
     {
       Serial1.print('.');
       delay(1000);
+      if (wifiAttempts == 21) // half the number used for connecting, now assuming that router is rebooting and needs timeout s
+      {
+        Serial1.print('... waiting ...');
+        delay(timeout.toInt()*1000);
+      }
     }
     if (wifiAttempts == 41)
     {
@@ -374,6 +393,7 @@ void handleUpdate()
   String dns = _setupServer->arg(FIELD_DNS);
   String gateway = _setupServer->arg(FIELD_GATEWAY);
   String subnet = _setupServer->arg(FIELD_SUBNET);
+  String timeout = _setupServer->arg(FIELD_TIMEOUT);
 
   Serial1.println("Submitted parameters:");
   Serial1.printf("SSID: '%s'\n", ssid.c_str());
@@ -388,6 +408,7 @@ void handleUpdate()
   Serial1.printf("DNS: '%s'\n", dns.c_str());
   Serial1.printf("Gateway: '%s'\n", gateway.c_str());
   Serial1.printf("Subnet: '%s'\n", subnet.c_str());
+  Serial1.printf("Timeout: '%s'\n", timeout.c_str());
 
   // check if mandatory parameters have been set
   if (ssid.length() == 0 || port.length() == 0)
@@ -418,6 +439,7 @@ void handleUpdate()
   configFile.println(dns);
   configFile.println(gateway);
   configFile.println(subnet);
+  configFile.println(timeout);
 
   configFile.close();
   yield();
@@ -436,6 +458,7 @@ void handleUpdate()
   htmlSuccess.replace("%%dns", dns);
   htmlSuccess.replace("%%gateway", gateway);
   htmlSuccess.replace("%%subnet", subnet);
+  htmlSuccess.replace("%%timeout", timeout),
   
   //leave setup mode and restart with existing configuration
   _setupServer->send(200, "text/html", htmlSuccess);
