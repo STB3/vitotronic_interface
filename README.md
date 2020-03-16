@@ -40,9 +40,11 @@ or
 2. *Optolink* adapter needs to be configured, that it will be recognized in the local WLAN network
 3. Get the IP address of the *Optolink* Adapter, type in IP address and path to new firmware, port remains 8266
 4. Press Flash
+
    ![picture](pic/vitotronic-interface_OTA-pic01.jpg)
 
 5. In case the flashing procedure does not work, disconnect the *Optolink" adapter from power supply, reconnect and try again
+
 **Remark**: If you are flashing a firmware, which has a different layout of the configuration, configuration should be deleted during the first start (see below).
 
 ## Setting up the *Optolink* hardware
