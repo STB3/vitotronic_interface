@@ -1,5 +1,5 @@
-/*
- * ESP8266 sketch for the Viessmann Optolink WLAN interface.
+//- -----------------------------------------------------------------------------------------------------------------------
+/* ESP8266 sketch for the Viessmann Optolink WLAN interface.
  * Sketch establshes an option for connection to a WLAN router.
  * If connected, the data from an Optolink to the router and heating can be controlled via fhem.
  *
@@ -15,25 +15,31 @@
  * Ver. 2.x:
  * - GPIO0 for 1-wire
  * - GPIO2 for config (or for debug messages alternatively)
+ * - 512k RAM/64k SPIFFS (in case of blue ESP8266 ESP01 modules)
  * - 1M RAM/64 kSPIFFS (in case of black ESP8266 ESP01 modules)
  * 
  * Software
- * Version 1.0 - renemt see https://github.com/rene-mt/vitotronic-interface-8266/blob/master/vitotronic-interface-8266.ino
- * Version 1.1 - Peter Mühlbeyer
+ * version 1.0 - renemt see https://github.com/rene-mt/vitotronic-interface-8266/blob/master/vitotronic-interface-8266.ino
+ * version 1.1 - Peter Mühlbeyer (PeMue@forum.fhem.de)
  * - added some comments for better understanding
  * - debug output disabled for default (can be switched on again)
- * Version 1.2 - Peter Mühlbeyer
+ * version 1.2 - Peter Mühlbeyer
  * - added parameter timeout to ensure a proper connection to the router after reboot (e.g. in case of power loss)
  * - changed default port from 8888 to 81 (like in LaCrosse gateway)
+ * version 1.3 - Peter Mühlbeyer
+ * - added OTA flash and print firmware version on setup and success page
  */
+//- -----------------------------------------------------------------------------------------------------------------------
 
 // import required libraries, ESP8266 libraries >2.1.0 are required
 #include <ESP8266WiFi.h>
 #include <FS.h>
 #include <ESP8266WebServer.h>
+// for OTA update
+#include <ArduinoOTA.h>
 
 // define sketch version
-#define SV "1.2"
+#define FIRMWARE_VER "1.3"
 
 // GPIO pin triggering setup interrupt for re-configuring the server
 //#define SETUP_INTERRUPT_PIN 12    //for optolink adapter v1.x
@@ -50,7 +56,7 @@
 uint8_t _setupMode = 0;
 
 /*
-   Config file layout - one entry per line, eight lines overall, terminated by '\n':
+  Config file layout - one entry per line, eight lines overall, terminated by '\n':
     <ssid>
     <password>
     <port>
@@ -61,9 +67,10 @@ uint8_t _setupMode = 0;
     <timeout>
 */
 
-//path+filename of the WiFi configuration file in the ESP's internal file system.
+// path+filename of the WiFi configuration file in the ESP's internal file system
 const char* _configFile = "/config/config.txt";
 
+// some basic WLAN definitions
 #define FIELD_SSID "ssid"
 #define FIELD_PASSWORD "password"
 #define FIELD_PORT "port"
@@ -79,7 +86,7 @@ const char* _htmlConfigTemplate =
       "<title>Vitotronic WiFi Interface</title>" \
     "</head>" \
     "<body>" \
-      "<h1>Vitotronic WiFi Interface</h1>" \
+      "<h1>Vitotronic WiFi Interface v%%ver</h1>" \
       "<h2>Setup</h2>" \
       "<form action=\"update\" id=\"update\" method=\"post\">" \
         "<p>Fields marked by (*) are mandatory.</p>" \
@@ -105,7 +112,7 @@ const char* _htmlConfigTemplate =
         "</p>" \
         "<h3>Timeout</h3>" \
         "<p>" \
-          "<div>The Vitotronic WiFi Interface will try to connect after <timeout> s after the reboot of the router:</div>" \
+          "<div>The Vitotronic WiFi Interface will try to connect (timeout) s after the reboot of the router:</div>" \
           "<label for=\"" FIELD_TIMEOUT "\">Timeout (*):</label><input type=\"number\" name=\"" FIELD_TIMEOUT "\" value=\"60\" required />" \
         "</p>" \
         "<div>" \
@@ -122,7 +129,7 @@ const char* _htmlSuccessTemplate =
       "<title>Vitotronic WiFi Interface</title>" \
     "</head>" \
     "<body>" \
-      "<h1>Vitotronic WiFi Interface</h1>" \
+      "<h1>Vitotronic WiFi Interface v%%ver</h1>" \
       "<h2>Configuration saved</h2>" \
       "<p>" \
         "The configuration has been successfully saved to the adapter:<br/><br/>" \
@@ -133,7 +140,7 @@ const char* _htmlSuccessTemplate =
         "- DNS server: %%dns<br/>" \
         "- Gateway: %%gateway<br/>" \
         "- Subnet mask: %%subnet<br/><br/>" \
-        "- Timeout: %%timeout<br/>" \
+        "- Timeout: %%timeout<br/><br/>" \
         "The adapter will reboot now and connect to the specified WiFi network. In case of a successful connection the <em>vitotronic-interface</em> network will be gone. <br/>" \
         "<strong>If no connection is possible, e.g. because the password is wrong or the network is not available, the adapter will return to setup mode again.</strong>" \
       "</p>" \
@@ -149,7 +156,9 @@ ESP8266WebServer* _setupServer = NULL;
 WiFiServer* server = NULL;
 WiFiClient serverClient;
 
-//helper function to remove trailing CR (0x0d) from strings read from config file
+//- -----------------------------------------------------------------------------------------------------------------------
+// helper function to remove trailing CR (0x0d) from strings read from config file
+//- -----------------------------------------------------------------------------------------------------------------------
 String removeTrailingCR(String input)
 {
   if (!input)
@@ -160,16 +169,18 @@ String removeTrailingCR(String input)
   }
   return input;
 }
+//- -----------------------------------------------------------------------------------------------------------------------
 
+//- -----------------------------------------------------------------------------------------------------------------------
 // setup of the program
+//- -----------------------------------------------------------------------------------------------------------------------
 void setup()
 {
   Serial1.begin(115200); // serial1 (GPIO2) as debug output (TX), with 115200,N,1
   // uncomment next line to enable debugging, not for productive use
   //Serial1.setDebugOutput(true);
   Serial1.setDebugOutput(DEBUG_SERIAL1);
-  //Serial1.println("\nVitotronic WiFi Interface\n");
-  Serial1.printf("\nVitotronic WiFi Interface v'%s'\n\n", SV);
+  Serial1.printf("\nVitotronic WiFi Interface v'%s'\n\n", FIRMWARE_VER);
   yield();
 
   //try to read config file from internal file system
@@ -204,11 +215,15 @@ void setup()
 
     configFile.close();
 
-    // Initialize WiFi
+    // initialize WiFi
     WiFi.disconnect();
     yield();
     WiFi.mode(WIFI_STA);
     yield();
+    
+    // initialize OTA
+    ArduinoOTA.setPort(8266);
+    ArduinoOTA.begin();
     
     if (ip && ip.length() > 0
         && dns && dns.length() > 0
@@ -284,15 +299,19 @@ void setup()
   attachInterrupt(digitalPinToInterrupt(SETUP_INTERRUPT_PIN), setupInterrupt, FALLING);
   Serial1.printf("Interrupt for re-entering setup mode attached to GPIO%d\n\n", SETUP_INTERRUPT_PIN); 
 }
+//- -----------------------------------------------------------------------------------------------------------------------
 
-// wifiSerialLoop ???
+//- -----------------------------------------------------------------------------------------------------------------------
+// wifiSerialLoop, serial loop
+//- -----------------------------------------------------------------------------------------------------------------------
 void wifiSerialLoop()
 {
   uint8_t i;
-  //check if there is a new client trying to connect
+
+  // check if there is a new client trying to connect
   if (server && server->hasClient())
   {
-    //check, if no client is already connected
+    // check, if no client is already connected
     if (!serverClient || !serverClient.connected())
     {
       if (serverClient) serverClient.stop();
@@ -301,15 +320,14 @@ void wifiSerialLoop()
     }
     else
     {
-      //reject additional connection requests.
+      // reject additional connection requests.
       WiFiClient serverClient = server->available();
       serverClient.stop();
     }
   }
-
   yield();
 
-  //check client for data
+  // check client for data
   if (serverClient && serverClient.connected())
   {
     size_t len = serverClient.available();
@@ -318,12 +336,12 @@ void wifiSerialLoop()
       uint8_t sbuf[len];
       serverClient.read(sbuf, len);
 
-      // Write received WiFi data to serial
+      // write received WiFi data to serial
       Serial.write(sbuf, len);
 
       yield();
 
-      // Debug output received WiFi data to Serial1
+      // debug output received WiFi data to Serial1
       //Serial1.println();
       Serial1.print("WiFi: ");
       for (uint8_t n = 0; n < len; n++)
@@ -333,25 +351,23 @@ void wifiSerialLoop()
       Serial1.println();
     }
   }
-
   yield();
 
-  //check UART for data
+  // check UART for data
   if (Serial.available())
   {
     size_t len = Serial.available();
     uint8_t sbuf[len];
     Serial.readBytes(sbuf, len);
 
-    //push UART data to connected WiFi client
+    // push UART data to connected WiFi client
     if (serverClient && serverClient.connected())
     {
       serverClient.write(sbuf, len);
     }
-
     yield();
 
-    // Debug output received Serial data to Serial1
+    // debug output received Serial data to Serial1
     //Serial1.println();
     Serial1.print("Serial: ");
     for (uint8_t n = 0; n < len; n++)
@@ -361,17 +377,27 @@ void wifiSerialLoop()
     Serial1.println();
   }
 }
+//- -----------------------------------------------------------------------------------------------------------------------
 
+//- -----------------------------------------------------------------------------------------------------------------------
 // handleRoot: goes to setup page
+//- -----------------------------------------------------------------------------------------------------------------------
 void handleRoot()
 {
   if (_setupServer)
   {
-    _setupServer->send(200, "text/html", _htmlConfigTemplate);
+    String htmlConfig(_htmlConfigTemplate);
+    htmlConfig.replace("%%ver", FIRMWARE_VER);
+
+    //_setupServer->send(200, "text/html", _htmlConfigTemplate);
+    _setupServer->send(200, "text/html", htmlConfig);
   }
 }
+//- -----------------------------------------------------------------------------------------------------------------------
 
-// handleUpdate: ???
+//- -----------------------------------------------------------------------------------------------------------------------
+// handleUpdate: goto update page
+//- -----------------------------------------------------------------------------------------------------------------------
 void handleUpdate()
 {
   Serial1.println("handleUpdate()");
@@ -451,6 +477,7 @@ void handleUpdate()
   }
 
   String htmlSuccess(_htmlSuccessTemplate);
+  htmlSuccess.replace("%%ver", FIRMWARE_VER);
   htmlSuccess.replace("%%ssid", ssid);
   htmlSuccess.replace("%%password", maskedPassword);
   htmlSuccess.replace("%%port", port);
@@ -467,23 +494,34 @@ void handleUpdate()
   delay(10);
   ESP.reset();
 }
+//- -----------------------------------------------------------------------------------------------------------------------
 
-// SetupInterrupt: goes to config in case button has been pushed
+//- -----------------------------------------------------------------------------------------------------------------------
+// setupInterrupt: goes to config in case button has been pushed
+//- -----------------------------------------------------------------------------------------------------------------------
 void setupInterrupt()
 {
-  //if the setup button has been pushed delete the existing configuration and reset the ESP to enter setup mode again
+  // if the setup button has been pushed delete the existing configuration and reset the ESP to enter setup mode again
   Serial1.println("Reset button pressed, deleting existing configuration");
   SPIFFS.begin();
   SPIFFS.remove(_configFile);
   yield();
   ESP.reset();
 }
+//- -----------------------------------------------------------------------------------------------------------------------
 
+//- -----------------------------------------------------------------------------------------------------------------------
 // main loop, runs until infinity
+//- -----------------------------------------------------------------------------------------------------------------------
 void loop()
 {
   if (!_setupMode)
+  {
     wifiSerialLoop();
+    // handle OTA flash, in case WLAN connection is available
+    ArduinoOTA.handle();
+  }
   else if (_setupServer)
     _setupServer->handleClient();
 }
+//- -----------------------------------------------------------------------------------------------------------------------

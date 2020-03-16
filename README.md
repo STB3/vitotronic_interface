@@ -25,11 +25,23 @@ Initial version by renemt.
 - added parameter timeout to ensure a proper connection to the router after reboot (e.g. in case of power loss)
 - changed default port from 8888 to 81 (like in Lacrosse GateWay)
 
+### v1.3 (PeMue):
+- added OTA flash possibility
+- print firmware version on setup and success page
+
 ## Flashing the firmware
 1. Install the Arduino IDE plus the 8266 package following the instructions at https://github.com/esp8266/Arduino#installing-with-boards-manager
 2. Open, compile and upload the *vitotronic_interface.ino* sketch to your ESP8266.
 or
 3. Flash the precomiled binary in from the releases directory.
+
+## Flashing the firmware OTA (**O**ver **T**he **A**ir)
+1. Get flash tool from [here](https://1st.bitbumper.de/ota-firmware-update-tool-for-esp8266/) (Windows 64-bit necessary) and run it
+2. *Optolink* adapter needs to be configured, that it will be recognized in the local WLAN network
+3. Get the IP address of the *Optolink* Adapter, type in IP address and path to new firmware, port remains 8266
+4. Press Flash
+   ![picture](pic/vitotronic-interface_OTA-pic01.jpg)
+5. In case the flashing procedure does not work, disconnect the *Optolink" adapter from power supply, reconnect and try agaiin
 
 ## Setting up the *Optolink* hardware
 * Wire up the ESP8266 and power supply.
