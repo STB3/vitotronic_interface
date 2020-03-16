@@ -31,8 +31,10 @@ Initial version by renemt.
 
 ## Flashing the firmware
 1. Install the Arduino IDE plus the 8266 package following the instructions at https://github.com/esp8266/Arduino#installing-with-boards-manager
-2. Open, compile and upload the *vitotronic_interface.ino* sketch to your ESP8266.
-or
+2. Open, compile and upload the *vitotronic_interface.ino* sketch to your ESP8266
+
+**or**
+
 3. Flash the precomiled binary in from the releases directory.
 
 ## Flashing the firmware OTA (**O**ver **T**he **A**ir)
