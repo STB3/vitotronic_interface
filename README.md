@@ -41,7 +41,9 @@ or
 3. Get the IP address of the *Optolink* Adapter, type in IP address and path to new firmware, port remains 8266
 4. Press Flash
    ![picture](pic/vitotronic-interface_OTA-pic01.jpg)
-5. In case the flashing procedure does not work, disconnect the *Optolink" adapter from power supply, reconnect and try agaiin
+
+5. In case the flashing procedure does not work, disconnect the *Optolink" adapter from power supply, reconnect and try again
+**Remark**: If you are flashing a firmware, which has a different layout of the configuration, configuration should be deleted during the first start (see below).
 
 ## Setting up the *Optolink* hardware
 * Wire up the ESP8266 and power supply.
@@ -64,6 +66,6 @@ As long as the ESP of the adapter is not configured for connecting to a WiFi net
   * The **Port** at which the adapter listens for an incoming connection (mandatory)
   * A **Timeout** value (in s) which the adapter should wait after reboot to re-establish WLAN connection (mandatory).
 * Press "Submit" afterwards. The adapter will save the configuration, restart and connect to the given WiFi network. Afterwards the server will be reachable in the network at the IP (DHCP or static) and specified port. The server's IP is also pingable.
-**Important notice:** Some ESP8266 modules need a "hard reset" to be able to connect to the new WiFi network. Therefore it is recommended to interrupt the power supply for a short time after the new configuration has been submitted. If the connection was successlful, the *vitotronic-interface* network will be gone and the adapter should be pingable in the specified network.
+**Important notice:** Some ESP8266 modules need a "hard reset" to be able to connect to the new WiFi network. Therefore it is recommended to interrupt the power supply for a short time after the new configuration has been submitted. If the connection was successful, the *vitotronic-interface* network will be gone and the adapter should be pingable in the specified network.
 
 To re-configure the adapter, connect *GPIO12* (hardware v1.x) (or *GPIO2* (hardware v2.x)) to *GND* for a short time (e.g. by a pushbutton). Thus, the existing configuration will be deleted and the adapter will enter setup mode again (see above).
