@@ -1,4 +1,4 @@
-//- -----------------------------------------------------------------------------------------------------------------------
+//- -------------------------------------------------------------------------------------------------
 /* ESP8266 sketch for the Viessmann Optolink WLAN interface.
  * Sketch establshes an option for connection to a WLAN router.
  * If connected, the data from an Optolink to the router and heating can be controlled via fhem.
@@ -28,8 +28,13 @@
  * - changed default port from 8888 to 81 (like in LaCrosse gateway)
  * version 1.3 - Peter Mühlbeyer
  * - added OTA flash and print firmware version on setup and success page
+ *
+ * version 2.0 - Peter Mühlbeyer
+ * - added 1-wire temperature measurement (only for hardware >=v2.2)
+ * - check if 1-wire sensors are available and send the values via UDP
+ * - added the time for 1-wire measurement to the setup page
  */
-//- -----------------------------------------------------------------------------------------------------------------------
+//- -------------------------------------------------------------------------------------------------
 
 // import required libraries, ESP8266 libraries >2.1.0 are required
 #include <ESP8266WiFi.h>
@@ -37,9 +42,16 @@
 #include <ESP8266WebServer.h>
 // for OTA update
 #include <ArduinoOTA.h>
+// for 1-wire
+#include <OneWire.h>
+#include <DallasTemperature.h>
+#define ONE_WIRE_PIN 0                           // works only for hardware v2.2 and bigger
+#define T_PRECISION 12                           // always highest precision
+#define REQUIRESALARMS false                     // no 1-wire alarms for this firmware necessary, redefinition from library
+#define MAX_SENSORS 5                            // max. amount of sensors
 
 // define sketch version
-#define FIRMWARE_VER "1.3"
+#define FIRMWARE_VER "2.0"
 
 // GPIO pin triggering setup interrupt for re-configuring the server
 //#define SETUP_INTERRUPT_PIN 12    //for optolink adapter v1.x
@@ -55,6 +67,26 @@
 // setup mode flag, 1 when in setup mode, 0 otherwise
 uint8_t _setupMode = 0;
 
+// constant for time between measurements in ms (not necessary, integrated in setup (interval))
+//const int UPDATE_TIME = 20000;
+int interval_1wire = -1;
+
+// setup a oneWire instance to communicate with any OneWire devices (not just Maxim/Dallas temperature ICs)
+OneWire oneWire(ONE_WIRE_PIN);
+// pass the oneWire reference to Dallas Temperature
+DallasTemperature sensors(&oneWire);
+// how many devices are connected?
+int devicesFound = 0;
+// arrays to store device addresses
+DeviceAddress devices[MAX_SENSORS];
+// array for raw temperature
+float tempC[MAX_SENSORS];
+
+// for UDP cnonnection, multicast declaration
+WiFiUDP Udp;
+IPAddress ipMulti(239, 0, 0, 57);                // multicast address
+unsigned int portMulti = 12345;                  // local UDP port
+
 /*
   Config file layout - one entry per line, eight lines overall, terminated by '\n':
     <ssid>
@@ -65,6 +97,7 @@ uint8_t _setupMode = 0;
     <gateway IP - or empty line>
     <subnet mask - or empty line>
     <timeout>
+    <1-wire interval>
 */
 
 // path+filename of the WiFi configuration file in the ESP's internal file system
@@ -79,6 +112,7 @@ const char* _configFile = "/config/config.txt";
 #define FIELD_GATEWAY "gateway"
 #define FIELD_SUBNET "subnet"
 #define FIELD_TIMEOUT "timeout"
+#define FIELD_1WINTERVAL "interval"
 
 const char* _htmlConfigTemplate =
   "<html>" \
@@ -110,10 +144,18 @@ const char* _htmlConfigTemplate =
           "<div>The Vitotronic WiFi Interface will listen at the following port for incoming telnet connections:</div>" \
           "<label for=\"" FIELD_PORT "\">Port (*):</label><input type=\"number\" name=\"" FIELD_PORT "\" value=\"81\" required />" \
         "</p>" \
+        "<p>" \
+          "<div>The 1-wire UDP port is fixed to: 12345</div>" \
+        "</p>" \
         "<h3>Timeout</h3>" \
         "<p>" \
           "<div>The Vitotronic WiFi Interface will try to connect (timeout) s after the reboot of the router:</div>" \
           "<label for=\"" FIELD_TIMEOUT "\">Timeout (*):</label><input type=\"number\" name=\"" FIELD_TIMEOUT "\" value=\"60\" required />" \
+        "</p>" \
+        "<h3>1-wire interval</h3>" \
+        "<p>" \
+          "<div>In case of 1-wire temperature sensors are connected, send the temperatures every (interval) s (between 20 and 3600 s):</div>" \
+          "<label for=\"" FIELD_1WINTERVAL "\">Interval (*):</label><input type=\"number\" name=\"" FIELD_1WINTERVAL "\" value=\"360\" required />" \
         "</p>" \
         "<div>" \
           "<button type=\"reset\">Reset</button>&nbsp;" \
@@ -141,6 +183,7 @@ const char* _htmlSuccessTemplate =
         "- Gateway: %%gateway<br/>" \
         "- Subnet mask: %%subnet<br/><br/>" \
         "- Timeout: %%timeout<br/><br/>" \
+        "- 1-wire interval: %%interval<br/><br/>" \
         "The adapter will reboot now and connect to the specified WiFi network. In case of a successful connection the <em>vitotronic-interface</em> network will be gone. <br/>" \
         "<strong>If no connection is possible, e.g. because the password is wrong or the network is not available, the adapter will return to setup mode again.</strong>" \
       "</p>" \
@@ -156,9 +199,9 @@ ESP8266WebServer* _setupServer = NULL;
 WiFiServer* server = NULL;
 WiFiClient serverClient;
 
-//- -----------------------------------------------------------------------------------------------------------------------
+//- -------------------------------------------------------------------------------------------------
 // helper function to remove trailing CR (0x0d) from strings read from config file
-//- -----------------------------------------------------------------------------------------------------------------------
+//- -------------------------------------------------------------------------------------------------
 String removeTrailingCR(String input)
 {
   if (!input)
@@ -169,11 +212,55 @@ String removeTrailingCR(String input)
   }
   return input;
 }
-//- -----------------------------------------------------------------------------------------------------------------------
+//- -------------------------------------------------------------------------------------------------
 
-//- -----------------------------------------------------------------------------------------------------------------------
+//- -------------------------------------------------------------------------------------------------
+// function to print a device address
+//- -------------------------------------------------------------------------------------------------
+void printAddress(DeviceAddress deviceAddress)
+{
+  for (uint8_t i = 0; i < 8; i++)
+  {
+    // zero pad the address if necessary
+    if (deviceAddress[i] < 16) Serial1.print("0");
+    Serial1.print(deviceAddress[i], HEX);
+  }
+}
+//- -------------------------------------------------------------------------------------------------
+
+//- -------------------------------------------------------------------------------------------------
+// function to print a device address
+//- -------------------------------------------------------------------------------------------------
+String printAddressStr(DeviceAddress deviceAddress)
+{
+  String outstr = "";
+  for (uint8_t i = 0; i < 8; i++)
+  {
+    // zero pad the address if necessary
+    if (deviceAddress[i] < 16) outstr += "0";
+    outstr += String(deviceAddress[i], HEX);
+  }
+  outstr.toUpperCase();
+  return outstr;
+}
+//- -------------------------------------------------------------------------------------------------
+
+//- -------------------------------------------------------------------------------------------------
+// function to print the temperature for a device
+//- -------------------------------------------------------------------------------------------------
+String printTemperatureStr(DeviceAddress deviceAddress)
+{
+  float tempC = sensors.getTempC(deviceAddress);
+  if (tempC < 10)
+    return "0" + (String)tempC;
+  else
+    return (String)tempC;
+}
+//- -------------------------------------------------------------------------------------------------
+
+//- -------------------------------------------------------------------------------------------------
 // setup of the program
-//- -----------------------------------------------------------------------------------------------------------------------
+//- -------------------------------------------------------------------------------------------------
 void setup()
 {
   Serial1.begin(115200); // serial1 (GPIO2) as debug output (TX), with 115200,N,1
@@ -183,7 +270,7 @@ void setup()
   Serial1.printf("\nVitotronic WiFi Interface v'%s'\n\n", FIRMWARE_VER);
   yield();
 
-  //try to read config file from internal file system
+  // try to read config file from internal file system
   SPIFFS.begin();
   File configFile = SPIFFS.open(_configFile, "r");
   if (configFile)
@@ -198,7 +285,7 @@ void setup()
     if (!ssid || ssid.length() == 0
         || !port || port.length() == 0)
     {
-      //reset & return to setup mode if minium configuration data is missing
+      // reset & return to setup mode if minium configuration data is missing
       Serial1.println("Minimum configuration data is missing (ssid, port) - resetting to setup mode");
       SPIFFS.remove(_configFile);
 
@@ -212,6 +299,8 @@ void setup()
     String gateway = removeTrailingCR(configFile.readStringUntil('\n'));
     String subnet = removeTrailingCR(configFile.readStringUntil('\n'));
     String timeout = removeTrailingCR(configFile.readStringUntil('\n'));
+    String interval = removeTrailingCR(configFile.readStringUntil('\n'));
+    interval_1wire = interval.toInt()*1000; // convert to ms
 
     configFile.close();
 
@@ -220,10 +309,6 @@ void setup()
     yield();
     WiFi.mode(WIFI_STA);
     yield();
-    
-    // initialize OTA
-    ArduinoOTA.setPort(8266);
-    ArduinoOTA.begin();
     
     if (ip && ip.length() > 0
         && dns && dns.length() > 0
@@ -245,6 +330,7 @@ void setup()
     Serial1.print("'");
 
     Serial1.printf("\nUsing timeout of '%s' s for reboot of router in case of power loss.'", timeout.c_str());
+    Serial1.printf("\nUsing 1-wire interval of '%s' s.'", interval.c_str());
 
     uint8_t wifiAttempts = 0;
     WiFi.begin(ssid.c_str(), password.c_str());
@@ -268,6 +354,46 @@ void setup()
     }
 
     Serial1.printf("\n\nReady! Server available at %s:%s\n", WiFi.localIP().toString().c_str(), port.c_str());
+    
+    // initialize OTA
+    ArduinoOTA.setPort(8266);
+    ArduinoOTA.begin();
+
+    // start up 1-wire bus
+    sensors.begin();
+    //sensors.setResolution(T_PRECISION); -> later
+    // locate devices on the bus
+    Serial1.println("Locating devices ...");
+    Serial1.print("Found ");
+    Serial1.print(sensors.getDeviceCount(), DEC);
+    Serial1.println(" device(s).");
+    devicesFound = sensors.getDeviceCount();  
+    // report parasite power requirements
+    Serial1.print("Parasite power is: "); 
+    if (sensors.isParasitePowerMode()) Serial1.println("ON");
+      else Serial1.println("OFF");
+    for (int i = 0; i < devicesFound; i++)
+      if (!sensors.getAddress(devices[i], i)) 
+        Serial1.println("Unable to find address for Device " + i); 
+    // show the addresses we found on the bus
+    for (int i = 0; i < devicesFound; i++)
+    {    
+      Serial1.print("Device " + (String)i + " Address: ");
+      printAddress(devices[i]);
+      Serial1.println();
+    }
+    // set precision for all found sensors
+    for (int i = 0; i < devicesFound; i++)
+      sensors.setResolution(devices[i], T_PRECISION);
+    // set wait routine for async
+    sensors.setWaitForConversion(false);
+   
+    // only if 1-wire devices found start UDP server
+    if (devicesFound > 0)
+    {
+      Udp.begin(portMulti);
+      Serial1.printf("UDP port at IP %s, UDP port %d opened\n", WiFi.localIP().toString().c_str(), portMulti);
+    }
 
     Serial.begin(4800, SERIAL_8E2); // Vitotronic connection runs at 4800,E,2
     Serial1.println("Serial port to Vitotronic opened at 4800 bps, 8E2");
@@ -299,11 +425,11 @@ void setup()
   attachInterrupt(digitalPinToInterrupt(SETUP_INTERRUPT_PIN), setupInterrupt, FALLING);
   Serial1.printf("Interrupt for re-entering setup mode attached to GPIO%d\n\n", SETUP_INTERRUPT_PIN); 
 }
-//- -----------------------------------------------------------------------------------------------------------------------
+//- -------------------------------------------------------------------------------------------------
 
-//- -----------------------------------------------------------------------------------------------------------------------
-// wifiSerialLoop, serial loop
-//- -----------------------------------------------------------------------------------------------------------------------
+//- -------------------------------------------------------------------------------------------------
+// wifiSerialLoop, serial loop (serial <-> WLAN)
+//- -------------------------------------------------------------------------------------------------
 void wifiSerialLoop()
 {
   uint8_t i;
@@ -331,11 +457,12 @@ void wifiSerialLoop()
   if (serverClient && serverClient.connected())
   {
     size_t len = serverClient.available();
+
     if (len)
     {
       uint8_t sbuf[len];
+      
       serverClient.read(sbuf, len);
-
       // write received WiFi data to serial
       Serial.write(sbuf, len);
 
@@ -358,8 +485,8 @@ void wifiSerialLoop()
   {
     size_t len = Serial.available();
     uint8_t sbuf[len];
-    Serial.readBytes(sbuf, len);
 
+    Serial.readBytes(sbuf, len);
     // push UART data to connected WiFi client
     if (serverClient && serverClient.connected())
     {
@@ -377,11 +504,140 @@ void wifiSerialLoop()
     Serial1.println();
   }
 }
-//- -----------------------------------------------------------------------------------------------------------------------
+//- -------------------------------------------------------------------------------------------------
 
-//- -----------------------------------------------------------------------------------------------------------------------
+//- -------------------------------------------------------------------------------------------------
+// OneWireLoop
+//- -------------------------------------------------------------------------------------------------
+void OneWireLoop(void)
+{
+  // cycle counter
+  static unsigned long cycle_count = 0; 
+  // start time of the last action
+  static long startTime = -1; 
+  // save the time (in ms) since start of processor
+  static long currentStateMillis = 0;
+  // variable for waiting time (depending on precision)
+  static int wait_conv_ms = 750 / (1 << (12 - T_PRECISION));
+  // variable for sending data via UDP
+  static String sendstr="";
+  // variable for time needed for complete 1-wire conversion
+  static long time_between_measurements;
+
+  // variables for state machine
+  static enum {START, WAIT_CONV, READ, COLLECT, SEND, WAIT_NEXT} state=START;
+  
+  // loop variable
+  static int j=0;
+  
+  // time in s
+  float tmess_s;
+
+  // state machine, depending on stati
+  switch (state)
+  {
+    // START: actual time stored, count incremented, start measurement
+    case START:
+      // overwrite time stamp with actual time
+      startTime = millis();
+      
+      // increment cycle_count
+      cycle_count++;
+      sensors.requestTemperatures();
+      state=WAIT_CONV;
+      yield();
+    break;
+
+    case WAIT_CONV:
+      if ((millis()-startTime)>wait_conv_ms) // if wait_conv_ms has been reached, switch to COLLECT (collect data)
+      {
+        currentStateMillis=millis();
+        state=READ;
+      }
+    break;
+
+    case READ:
+      if (j < devicesFound) // if still devices available to read temperature
+      {
+        //currentStateMillis=millis();
+        // getTempC requires approx. 13 ms
+        // getTemp (raw) is same as getTempC
+        // getTempCByIndex requires approx. 22 ms -> too slow
+        tempC[j]=sensors.getTempC(devices[j]);
+        //Serial1.print("After read temperature (READ) loop "); Serial.print(j, DEC); 
+        //Serial1.print(" "); Serial.print(millis()-startTime, DEC); Serial.print(" ms, ");
+        //Serial1.print(millis()-currentStateMillis, DEC); Serial.println(" ms.");
+        j++;
+        //yield();
+      }
+      else state=COLLECT;
+    break;
+
+    case COLLECT:
+      j = 0; // set loop variable to 0 again
+      //currentStateMillis=millis();
+      sendstr = "OK VALUES THz 1 cnt=";
+      sendstr += String(cycle_count, DEC);
+      sendstr += ",";
+
+      // print the device information
+      for (int i = 0; i < devicesFound; i++)
+      {
+        sendstr += printAddressStr(devices[i]);
+        sendstr += "=";
+        sendstr += String(tempC[i]);
+        if (i != devicesFound - 1) sendstr += ",";
+      }
+      //Serial1.print("After string collection (COLLECT) "); Serial.print(millis()-startTime, DEC); Serial.print(" ms, ");
+      //Serial1.print(millis()-currentStateMillis, DEC); Serial.println(" ms.");
+      // get the time for conversion
+      time_between_measurements = millis() - startTime;
+      sendstr += ",t_mess=";
+      //sendstr += String(time_between_measurements, DEC);
+      tmess_s=(float) time_between_measurements/1000;
+      sendstr += String(tmess_s, 3);
+      //yield();
+      state=SEND;
+    break;
+
+    case SEND:
+      //currentStateMillis=millis();
+      // send string to UPD port
+      if (Udp.beginPacketMulticast(ipMulti, portMulti, WiFi.localIP()) == 1) 
+      {
+        //Serial1.println("after Udp.beginPacketMulticast ...");
+	    Udp.write(sendstr.c_str());
+        //Serial1.println("after Udp.write ...");
+        Udp.endPacket();
+        //Serial1.println("after Udp.endPacket ...");
+	  }
+      //yield();
+      // get the time for sending, only for debug
+      //time_between_measurements = millis() - startTime;
+      //sendstr += ",t_tot=";
+      //sendstr += String(time_between_measurements, DEC);
+      //Serial.print("After sending "); Serial.print(millis()-startTime, DEC); Serial.print(" ms, ");
+      //Serial.print(millis()-currentStateMillis, DEC); Serial.println(" ms.");
+      //Serial.println(sendstr);
+      state=WAIT_NEXT;
+    break;
+    
+    case WAIT_NEXT:
+      if ((millis()-startTime)>=interval_1wire) // if UPDATE_TIME/interval_1wire has been reached, switch to START again
+      {
+        //currentStateMillis=millis();
+        state=START;
+        //Serial.print("After restart again "); Serial.print(millis()-startTime, DEC); Serial.print(" ms, ");
+        //Serial.print(millis()-currentStateMillis, DEC); Serial.println(" ms.");
+      }
+    break;
+  }  
+}
+//- -------------------------------------------------------------------------------------------------
+
+//- -------------------------------------------------------------------------------------------------
 // handleRoot: goes to setup page
-//- -----------------------------------------------------------------------------------------------------------------------
+//- -------------------------------------------------------------------------------------------------
 void handleRoot()
 {
   if (_setupServer)
@@ -393,11 +649,11 @@ void handleRoot()
     _setupServer->send(200, "text/html", htmlConfig);
   }
 }
-//- -----------------------------------------------------------------------------------------------------------------------
+//- -------------------------------------------------------------------------------------------------
 
-//- -----------------------------------------------------------------------------------------------------------------------
+//- -------------------------------------------------------------------------------------------------
 // handleUpdate: goto update page
-//- -----------------------------------------------------------------------------------------------------------------------
+//- -------------------------------------------------------------------------------------------------
 void handleUpdate()
 {
   Serial1.println("handleUpdate()");
@@ -420,6 +676,7 @@ void handleUpdate()
   String gateway = _setupServer->arg(FIELD_GATEWAY);
   String subnet = _setupServer->arg(FIELD_SUBNET);
   String timeout = _setupServer->arg(FIELD_TIMEOUT);
+  String interval = _setupServer->arg(FIELD_1WINTERVAL);
 
   Serial1.println("Submitted parameters:");
   Serial1.printf("SSID: '%s'\n", ssid.c_str());
@@ -435,6 +692,7 @@ void handleUpdate()
   Serial1.printf("Gateway: '%s'\n", gateway.c_str());
   Serial1.printf("Subnet: '%s'\n", subnet.c_str());
   Serial1.printf("Timeout: '%s'\n", timeout.c_str());
+  Serial1.printf("1-wire interval: '%s'\n", interval.c_str());
 
   // check if mandatory parameters have been set
   if (ssid.length() == 0 || port.length() == 0)
@@ -444,7 +702,7 @@ void handleUpdate()
     return;
   }
 
-  //for static IP configuration: check if all parameters have been set
+  // for static IP configuration: check if all parameters have been set
   if (ip.length() > 0 || dns.length() > 0 || gateway.length() > 0 || subnet.length() > 0 &&
       (ip.length() == 0 || dns.length() == 0 || gateway.length() == 0 || subnet.length() == 0))
   {
@@ -453,7 +711,13 @@ void handleUpdate()
     return;
   }
 
-  //write configuration data to file
+  // check, if values are out of range, if not, correct them
+  if (timeout.toInt() < 0) timeout = "0";
+  if (timeout.toInt() > 120) timeout = "120";
+  if (interval.toInt() < 5) interval = "20";  // allow also 5 s time between 1-wire measurement for testing
+  if (interval.toInt() > 3600) interval = "3600";
+  
+  // write configuration data to file
   Serial1.printf("Writing config to file '%s'", _configFile);
   SPIFFS.begin();
   File configFile = SPIFFS.open(_configFile, "w");
@@ -466,6 +730,7 @@ void handleUpdate()
   configFile.println(gateway);
   configFile.println(subnet);
   configFile.println(timeout);
+  configFile.println(interval);
 
   configFile.close();
   yield();
@@ -485,7 +750,8 @@ void handleUpdate()
   htmlSuccess.replace("%%dns", dns);
   htmlSuccess.replace("%%gateway", gateway);
   htmlSuccess.replace("%%subnet", subnet);
-  htmlSuccess.replace("%%timeout", timeout),
+  htmlSuccess.replace("%%timeout", timeout);
+  htmlSuccess.replace("%%interval", interval);
   
   //leave setup mode and restart with existing configuration
   _setupServer->send(200, "text/html", htmlSuccess);
@@ -494,11 +760,11 @@ void handleUpdate()
   delay(10);
   ESP.reset();
 }
-//- -----------------------------------------------------------------------------------------------------------------------
+//- -------------------------------------------------------------------------------------------------
 
-//- -----------------------------------------------------------------------------------------------------------------------
+//- -------------------------------------------------------------------------------------------------
 // setupInterrupt: goes to config in case button has been pushed
-//- -----------------------------------------------------------------------------------------------------------------------
+//- -------------------------------------------------------------------------------------------------
 void setupInterrupt()
 {
   // if the setup button has been pushed delete the existing configuration and reset the ESP to enter setup mode again
@@ -508,20 +774,27 @@ void setupInterrupt()
   yield();
   ESP.reset();
 }
-//- -----------------------------------------------------------------------------------------------------------------------
+//- -------------------------------------------------------------------------------------------------
 
-//- -----------------------------------------------------------------------------------------------------------------------
+//- -------------------------------------------------------------------------------------------------
 // main loop, runs until infinity
-//- -----------------------------------------------------------------------------------------------------------------------
+//- -------------------------------------------------------------------------------------------------
 void loop()
 {
   if (!_setupMode)
   {
+    // establish main serial server
     wifiSerialLoop();
     // handle OTA flash, in case WLAN connection is available
     ArduinoOTA.handle();
+    // perform 1-wire measurement loop
+    if (devicesFound == 0)
+    {
+       Serial1.println("No devices found.");
+    }
+    else OneWireLoop();
   }
   else if (_setupServer)
     _setupServer->handleClient();
 }
-//- -----------------------------------------------------------------------------------------------------------------------
+//- -------------------------------------------------------------------------------------------------
