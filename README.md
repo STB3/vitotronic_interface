@@ -87,4 +87,5 @@ As long as the ESP of the adapter is not configured for connecting to a WiFi net
 
     ![picture](pic/vitotronic_interface_v2.1-pic02.jpg)
 
+## Re-onfiguring the adapter
 To re-configure the adapter, connect *GPIO12* (hardware v1.x) (or *GPIO2* (hardware v2.x)) to *GND* for a short time (e.g. by a pushbutton). Thus, the existing configuration will be deleted and the adapter will enter setup mode again (see above).
