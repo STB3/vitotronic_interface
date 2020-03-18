@@ -33,6 +33,9 @@
  * - added 1-wire temperature measurement (only for hardware >=v2.2)
  * - check if 1-wire sensors are available and send the values via UDP
  * - added the time for 1-wire measurement to the setup page
+ * version 2.1 - Peter Mühlbeyer
+ * - reset cycle counter every 24 h, unsigned long instead of long
+ * - apply patch for static configuration from: https://forum.fhem.de/index.php/topic,51932.msg451195.html#msg451195
  */
 //- -------------------------------------------------------------------------------------------------
 
@@ -51,7 +54,7 @@
 #define MAX_SENSORS 5                            // max. amount of sensors
 
 // define sketch version
-#define FIRMWARE_VER "2.0"
+#define FIRMWARE_VER "2.1"
 
 // GPIO pin triggering setup interrupt for re-configuring the server
 //#define SETUP_INTERRUPT_PIN 12    //for optolink adapter v1.x
@@ -128,7 +131,7 @@ const char* _htmlConfigTemplate =
         "<p>" \
           "<div>The following information is required to set up the WiFi connection of the server.</div>" \
           "<label for=\"" FIELD_SSID "\">SSID (*):</label><input type=\"text\" name=\"" FIELD_SSID "\" required  />" \
-          "<label for=\"" FIELD_PASSWORD "\">Password:</label><input type=\"password\" name=\"" FIELD_PASSWORD "\" />" \
+          "<label for=\"" FIELD_PASSWORD "\">Password: (*)</label><input type=\"password\" name=\"" FIELD_PASSWORD "\" />" \
         "</p>" \
         "<h3>Static IP settings</h3>" \
         "<p>" \
@@ -318,7 +321,17 @@ void setup()
       //set static IP configuration, if available
       Serial1.println("Static IP configuration available:");
       Serial1.printf("IP: '%s', DNS: '%s', gateway: '%s', subnet mask: '%s'\n", ip.c_str(), dns.c_str(), gateway.c_str(), subnet.c_str());
-      WiFi.config(IPAddress().fromString(ip), IPAddress().fromString(dns), IPAddress().fromString(gateway), IPAddress().fromString(subnet));
+      // change from: https://forum.fhem.de/index.php/topic,51932.msg451195.html#msg451195
+      //WiFi.config(IPAddress().fromString(ip), IPAddress().fromString(dns), IPAddress().fromString(gateway), IPAddress().fromString(subnet));
+      IPAddress ipIP;
+      ipIP.fromString(ip);
+      IPAddress dnsIP;
+      dnsIP.fromString(dns);
+      IPAddress gatewayIP;
+      gatewayIP.fromString(gateway);
+      IPAddress subnetIP;
+      subnetIP.fromString(subnet);
+      WiFi.config(ipIP, dnsIP, gatewayIP, subnetIP);
       yield();
     }
 
@@ -540,7 +553,10 @@ void OneWireLoop(void)
     case START:
       // overwrite time stamp with actual time
       startTime = millis();
-      
+      // avoid overflow -> removed
+      //if (cycle_count >= 4294967295) cycle_count = 0;
+      // reset cycle counter every 24 h
+      if (cycle_count*interval_1wire/1000 >= 86400) cycle_count = 0;
       // increment cycle_count
       cycle_count++;
       sensors.requestTemperatures();
