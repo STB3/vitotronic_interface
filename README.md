@@ -40,13 +40,16 @@ Initial version by renemt.
 
 ## Flashing the firmware
 1. Install the Arduino IDE plus the 8266 package following these [instructions](https://github.com/esp8266/Arduino#installing-with-boards-manager)
-2. Open, compile and upload the *vitotronic_interface.ino* sketch to your ESP8266, use following settings 
+2. Install following Arduino libraries:
+   - [OneWire](https://github.com/PaulStoffregen/OneWire) (tested with v2.3.4)
+   - [DallasTemperature](https://github.com/milesburton/Arduino-Temperature-Control-Library) (tested with v3.8.0)
+3. Open, compile and upload the *vitotronic_interface.ino* sketch to your ESP8266, use following settings 
 
    ![picture](pic/vitotronic_interface-pic01.jpg)
 
    **or**
 
-3. Flash the precomiled binary in from the releases directory.
+4. Flash the precomiled binary in from the releases directory.
 
 ## Flashing the firmware OTA (**O**ver **T**he **A**ir)
 1. Get flash tool from [here](https://1st.bitbumper.de/ota-firmware-update-tool-for-esp8266/) (Windows 64-bit necessary) and run it
