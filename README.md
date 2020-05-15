@@ -49,7 +49,7 @@ Initial version by renemt.
 
    **or**
 
-4. Flash the precomiled binary in from the releases directory.
+4. Flash the precomiled binary from the releases directory.
 
 ## Flashing the firmware OTA (**O**ver **T**he **A**ir)
 1. Get flash tool from [here](https://1st.bitbumper.de/ota-firmware-update-tool-for-esp8266/) (Windows 64-bit necessary) and run it
