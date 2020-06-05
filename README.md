@@ -52,16 +52,20 @@ Initial version by renemt.
 4. Flash the precomiled binary from the releases directory.
 
 ### Notes on compiling
-If you compile the software on your own, please use ESP8266 libary between [v2.4.1](https://github.com/esp8266/Arduino/releases/tag/2.4.1) and [2.5.0](https://github.com/esp8266/Arduino/releases/tag/2.5.0).
-With library versions >2.5.0 the ESP8266 will get into boot loop and does not create an access point.
+If you compile the software on your own, please use ESP8266 libary between [v2.4.1](https://github.com/esp8266/Arduino/releases/tag/2.4.1) and [v2.5.0](https://github.com/esp8266/Arduino/releases/tag/2.5.0).
+With library versions >v2.5.0 the ESP8266 will get into boot loop and does not create an access point.
 Tested Arduino IDE versions: v1.8.8 and v1.8.11.
 
 ### Notes on flashing
 ESP8266 ESP-01 modules use memory modules from different memory manufactureres. Therefore the programming speed might be significantly different.
 Here an overview about possible memories and their flash speeds:
+
 `XTX  PN25F08`: QIO 115.200 baud  OK
+
 `XTX  PN25F08B`: **DOUT** 57.600 baud OK
+
 `T25S80`: QIO 57.600 OK
+
 In case of flashing does not seem possible or no access point is opened, DOUT and 57.600 baud should be used for flashing.
 
 ## Flashing the firmware OTA (**O**ver **T**he **A**ir)
