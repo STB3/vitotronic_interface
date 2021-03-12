@@ -37,6 +37,7 @@ Initial version by renemt.
 ### v2.1 (PeMue):
 - reset cycle counter every 24 h, unsigned long instead of long
 - apply patch for static configuration from: https://forum.fhem.de/index.php/topic,51932.msg451195.html#msg451195
+- add date of compilation
 
 ## Flashing the firmware
 1. Install the Arduino IDE plus the 8266 package following [these instructions](https://github.com/esp8266/Arduino#installing-with-boards-manager)

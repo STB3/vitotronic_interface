@@ -36,6 +36,15 @@
  * version 2.1 - Peter Mühlbeyer
  * - reset cycle counter every 24 h, unsigned long instead of long
  * - apply patch for static configuration from: https://forum.fhem.de/index.php/topic,51932.msg451195.html#msg451195
+ * - removed WiFi.mode(WIFI_AP) for setup with access point (to be compatible to ESP8266 libraries >2.5.0, does not work
+ * - add date of compilation acc. https://forum.arduino.cc/index.php?topic=189325.0, 
+ *   https://www.cprogramming.com/reference/preprocessor/__DATE__.html, 
+ *   https://www.cprogramming.com/reference/preprocessor/__TIME__.html,
+ *   https://gcc.gnu.org/onlinedocs/cpp/Standard-Predefined-Macros.html#Standard-Predefined-Macros,
+ *   https://forum.arduino.cc/index.php?topic=158014.0, https://gcc.gnu.org/onlinedocs/gcc-5.1.0/cpp.pdf
+ *   directives: __DATE__, __TIME__,  __VERSION__ (not reliable)
+ *   Arduino IDE version: ARDUINO (decimal)
+ *   from LaCrosse Gateway: ESP.getCoreVersion(); ESP.getSdkVersion();
  */
 //- -------------------------------------------------------------------------------------------------
 
@@ -53,8 +62,9 @@
 #define REQUIRESALARMS false                     // no 1-wire alarms for this firmware necessary, redefinition from library
 #define MAX_SENSORS 5                            // max. amount of sensors
 
-// define sketch version
+// define sketch version, variable for compiler information
 #define FIRMWARE_VER "2.1"
+String compiler;
 
 // GPIO pin triggering setup interrupt for re-configuring the server
 //#define SETUP_INTERRUPT_PIN 12    //for optolink adapter v1.x
@@ -72,7 +82,7 @@ uint8_t _setupMode = 0;
 
 // constant for time between measurements in ms (not necessary, integrated in setup (interval))
 //const int UPDATE_TIME = 20000;
-int interval_1wire = -1;
+unsigned int interval_1wire = -1;
 
 // setup a oneWire instance to communicate with any OneWire devices (not just Maxim/Dallas temperature ICs)
 OneWire oneWire(ONE_WIRE_PIN);
@@ -160,6 +170,9 @@ const char* _htmlConfigTemplate =
           "<div>In case of 1-wire temperature sensors are connected, send the temperatures every (interval) s (between 20 and 3600 s):</div>" \
           "<label for=\"" FIELD_1WINTERVAL "\">Interval (*):</label><input type=\"number\" name=\"" FIELD_1WINTERVAL "\" value=\"360\" required />" \
         "</p>" \
+        "<p>" \
+          "<div>Compiled with %%compiler.</div>"\
+        "<p>" \
         "<div>" \
           "<button type=\"reset\">Reset</button>&nbsp;" \
           "<button type=\"submit\">Submit</button>" \
@@ -266,11 +279,23 @@ String printTemperatureStr(DeviceAddress deviceAddress)
 //- -------------------------------------------------------------------------------------------------
 void setup()
 {
+  // get compile date, time, Arduino IDE version and ESP8266 core version
+  // Arduino IDE: ARDUINO as DEC variable
+  //const char ver_date[100] = FIRMWARE_VER " compiled with gcc v" __VERSION__ " on " __DATE__ ", " __TIME__;
+  //String compiler = String("Arduino IDE v" + ARDUINO + "on " + __DATE__ + ", " + __TIME__ + ESP.getCoreVersion());
+  compiler = String(ARDUINO, DEC);     // gets Arduino version, eg. 10808 or 10811
+  compiler.replace ("0", ".");         // replace 0 by . in Arduino IDE version
+  //compiler = compiler_temp.substring(1, 1) + "." + compiler_temp.substring(2, 2) + "." + compiler_temp.substring(3, compiler_temp.length());
+  // collect compiling date, time and ESP8266 core version
+  compiler = "Arduino IDE v" + compiler + " on " + __DATE__ + ", " + __TIME__ + ", ESP8266 core v" + ESP.getCoreVersion() + ", SDK v" + ESP.getSdkVersion();
+  compiler.replace ("_", ".");         // replace _ by . in ESP8266 core version info
+
   Serial1.begin(115200); // serial1 (GPIO2) as debug output (TX), with 115200,N,1
   // uncomment next line to enable debugging, not for productive use
   //Serial1.setDebugOutput(true);
   Serial1.setDebugOutput(DEBUG_SERIAL1);
   Serial1.printf("\nVitotronic WiFi Interface v'%s'\n\n", FIRMWARE_VER);
+  Serial1.printf("\nCompiled with "); Serial1.print(compiler); Serial1.print("\n\n");
   yield();
 
   // try to read config file from internal file system
@@ -336,7 +361,7 @@ void setup()
     }
 
     Serial1.printf("\nConnecting to WiFi network '%s' password: '", ssid.c_str());
-    for (int i=0; i<password.length(); i++)
+    for (unsigned int i=0; i<password.length(); i++)
     {
       Serial1.print("*");
     }
@@ -349,11 +374,11 @@ void setup()
     WiFi.begin(ssid.c_str(), password.c_str());
     while (WiFi.status() != WL_CONNECTED && wifiAttempts++ < 40)
     {
-      Serial1.print('.');
+      Serial1.print(".");
       delay(1000);
       if (wifiAttempts == 21) // half the number used for connecting, now assuming that router is rebooting and needs timeout s
       {
-        Serial1.print('... waiting ...');
+        Serial1.print("... waiting ...");
         delay(timeout.toInt()*1000);
       }
     }
@@ -418,7 +443,7 @@ void setup()
   {
     //start ESP in access point mode and provide a HTTP server at port 80 to handle the configuration page.
     Serial1.println("No WiFi config exists, switching to setup mode");
-    WiFi.mode(WIFI_AP);
+    //WiFi.mode(WIFI_AP); // might not be needed acc. http://onlineshouter.com/use-esp8266-wifi-modes-station-access-point/
     WiFi.softAP(SETUP_AP_SSID, SETUP_AP_PASSWORD);
 
     _setupServer = new ESP8266WebServer(80);
@@ -445,7 +470,7 @@ void setup()
 //- -------------------------------------------------------------------------------------------------
 void wifiSerialLoop()
 {
-  uint8_t i;
+  //uint8_t i;
 
   // check if there is a new client trying to connect
   if (server && server->hasClient())
@@ -527,11 +552,11 @@ void OneWireLoop(void)
   // cycle counter
   static unsigned long cycle_count = 0; 
   // start time of the last action
-  static long startTime = -1; 
+  static unsigned long startTime = -1; 
   // save the time (in ms) since start of processor
-  static long currentStateMillis = 0;
+  //static unsigned long currentStateMillis = 0;
   // variable for waiting time (depending on precision)
-  static int wait_conv_ms = 750 / (1 << (12 - T_PRECISION));
+  static unsigned int wait_conv_ms = 750 / (1 << (12 - T_PRECISION));
   // variable for sending data via UDP
   static String sendstr="";
   // variable for time needed for complete 1-wire conversion
@@ -567,7 +592,7 @@ void OneWireLoop(void)
     case WAIT_CONV:
       if ((millis()-startTime)>wait_conv_ms) // if wait_conv_ms has been reached, switch to COLLECT (collect data)
       {
-        currentStateMillis=millis();
+        //currentStateMillis=millis();
         state=READ;
       }
     break;
@@ -660,6 +685,8 @@ void handleRoot()
   {
     String htmlConfig(_htmlConfigTemplate);
     htmlConfig.replace("%%ver", FIRMWARE_VER);
+    htmlConfig.replace("%%compiler", compiler);
+    //htmlConfig.replace("%%ver", firmware_ver_date);
 
     //_setupServer->send(200, "text/html", _htmlConfigTemplate);
     _setupServer->send(200, "text/html", htmlConfig);
@@ -697,7 +724,7 @@ void handleUpdate()
   Serial1.println("Submitted parameters:");
   Serial1.printf("SSID: '%s'\n", ssid.c_str());
   Serial1.print("Password: '");
-  for (int i=0; i < password.length(); i++)
+  for (unsigned int i=0; i < password.length(); i++)
   {
     Serial1.print('*');
   }
@@ -719,7 +746,9 @@ void handleUpdate()
   }
 
   // for static IP configuration: check if all parameters have been set
-  if (ip.length() > 0 || dns.length() > 0 || gateway.length() > 0 || subnet.length() > 0 &&
+  //if (ip.length() > 0 || dns.length() > 0 || gateway.length() > 0 || subnet.length() > 0 &&
+  //    (ip.length() == 0 || dns.length() == 0 || gateway.length() == 0 || subnet.length() == 0))
+  if ((ip.length() > 0 || dns.length() > 0 || gateway.length() > 0 || subnet.length() > 0) &&
       (ip.length() == 0 || dns.length() == 0 || gateway.length() == 0 || subnet.length() == 0))
   {
     Serial1.println("Missing static IP parameters!");
@@ -752,13 +781,14 @@ void handleUpdate()
   yield();
   
   String maskedPassword = "";
-  for (int i=0; i<password.length(); i++)
+  for (unsigned int i=0; i<password.length(); i++)
   {
     maskedPassword+="*";
   }
 
   String htmlSuccess(_htmlSuccessTemplate);
   htmlSuccess.replace("%%ver", FIRMWARE_VER);
+  //htmlSuccess.replace("%%ver", firmware_ver_date);
   htmlSuccess.replace("%%ssid", ssid);
   htmlSuccess.replace("%%password", maskedPassword);
   htmlSuccess.replace("%%port", port);
