@@ -45,6 +45,11 @@
  *   directives: __DATE__, __TIME__,  __VERSION__ (not reliable)
  *   Arduino IDE version: ARDUINO (decimal)
  *   from LaCrosse Gateway: ESP.getCoreVersion(); ESP.getSdkVersion();
+ * - add solution for ESP8266 library > v2.5.0 acc. https://forum.fhem.de/index.php/topic,51583.msg1170834.html#msg1170834 and
+ *   https://stackoverflow.com/questions/58113937/esp8266-arduino-why-is-it-necessary-to-add-the-icache-ram-attr-macro-to-isrs-an
+ *   (solution and explanation see bottom)
+ * changes for future versions:
+ *   Consider change to LittleFS or other filesystems, as SPIFFS has been deprecated.
  */
 //- -------------------------------------------------------------------------------------------------
 
@@ -67,8 +72,9 @@
 String compiler;
 
 // GPIO pin triggering setup interrupt for re-configuring the server
-//#define SETUP_INTERRUPT_PIN 12    //for optolink adapter v1.x
-#define SETUP_INTERRUPT_PIN 2    //for optolink adapter v2.x
+//#define SETUP_INTERRUPT_PIN 12                 // for optolink adapter v1.x
+#define SETUP_INTERRUPT_PIN 2                    // for optolink adapter v2.x
+void ICACHE_RAM_ATTR setupInterrupt();           // to use ESP8266 library >v2.5.0
 
 // SSID and password for the configuration WiFi network established bei the ESP in setup mode
 #define SETUP_AP_SSID "vitotronic-interface"
@@ -82,7 +88,7 @@ uint8_t _setupMode = 0;
 
 // constant for time between measurements in ms (not necessary, integrated in setup (interval))
 //const int UPDATE_TIME = 20000;
-unsigned int interval_1wire = -1;
+unsigned int interval_1wire = 0;
 
 // setup a oneWire instance to communicate with any OneWire devices (not just Maxim/Dallas temperature ICs)
 OneWire oneWire(ONE_WIRE_PIN);
@@ -552,7 +558,7 @@ void OneWireLoop(void)
   // cycle counter
   static unsigned long cycle_count = 0; 
   // start time of the last action
-  static unsigned long startTime = -1; 
+  static unsigned long startTime = 0; 
   // save the time (in ms) since start of processor
   //static unsigned long currentStateMillis = 0;
   // variable for waiting time (depending on precision)
