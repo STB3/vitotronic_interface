@@ -36,14 +36,15 @@ Initial version by renemt.
 
 ### v2.1 (PeMue):
 - reset cycle counter every 24 h, unsigned long instead of long
-- apply patch for static configuration from: https://forum.fhem.de/index.php/topic,51932.msg451195.html#msg451195
+- apply patch for static configuration from [FHEM forum](https://forum.fhem.de/index.php/topic,51932.msg451195.html#msg451195)
 - add date of compilation
+- add patch for interrupt routine (ICACHE_RAM_ATTR) from [here](https://stackoverflow.com/questions/58113937/esp8266-arduino-why-is-it-necessary-to-add-the-icache-ram-attr-macro-to-isrs-an)
 
 ## Flashing the firmware
 1. Install the Arduino IDE plus the 8266 package following [these instructions](https://github.com/esp8266/Arduino#installing-with-boards-manager)
 2. Install following Arduino libraries:
    - [OneWire](https://github.com/PaulStoffregen/OneWire) (tested with v2.3.4)
-   - [DallasTemperature](https://github.com/milesburton/Arduino-Temperature-Control-Library) (tested with v3.8.0)
+   - [DallasTemperature](https://github.com/milesburton/Arduino-Temperature-Control-Library) (tested with v3.9.0)
 3. Open, compile and upload the *vitotronic_interface.ino* sketch to your ESP8266, use following settings 
 
    ![picture](pic/vitotronic_interface-pic01.jpg)
@@ -53,9 +54,9 @@ Initial version by renemt.
 4. Flash the precomiled binary from the releases directory.
 
 ### Notes on compiling
-If you compile the software on your own, please use ESP8266 libary between [v2.4.1](https://github.com/esp8266/Arduino/releases/tag/2.4.1) and [v2.5.0](https://github.com/esp8266/Arduino/releases/tag/2.5.0).
-With library versions >v2.5.0 the ESP8266 will get into boot loop and does not create an access point.
-Tested Arduino IDE versions: v1.8.8 and v1.8.11.
+~~If you compile the software on your own, please use ESP8266 libary between [v2.4.1](https://github.com/esp8266/Arduino/releases/tag/2.4.1) and [v2.5.0](https://github.com/esp8266/Arduino/releases/tag/2.5.0).
+With library versions >v2.5.0 the ESP8266 will get into boot loop and does not create an access point.~~
+Tested Arduino IDE versions: v1.8.8 / v1.8.11 and v1.8.16.
 
 ### Notes on flashing
 ESP8266 ESP-01 modules use memory modules from different memory manufactureres. Therefore the programming speed might be significantly different.
