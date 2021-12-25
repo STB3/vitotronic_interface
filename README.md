@@ -42,7 +42,7 @@ Initial version by renemt.
 
 ### v2.2 (PeMue):
 - changed from SPIFFS to LittleFS
-- **CAUTION:** Please erease complete ESP8266 chip before flashing new software.
+- **CAUTION:** Please erease complete ESP8266 chip before flashing new firmware.
 
 ## Flashing the firmware
 1. Install the Arduino IDE plus the 8266 package following [these instructions](https://github.com/esp8266/Arduino#installing-with-boards-manager)
