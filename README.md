@@ -37,8 +37,12 @@ Initial version by renemt.
 ### v2.1 (PeMue):
 - reset cycle counter every 24 h, unsigned long instead of long
 - apply patch for static configuration from [FHEM forum](https://forum.fhem.de/index.php/topic,51932.msg451195.html#msg451195)
-- add date of compilation
-- add patch for interrupt routine (ICACHE_RAM_ATTR) from [here](https://stackoverflow.com/questions/58113937/esp8266-arduino-why-is-it-necessary-to-add-the-icache-ram-attr-macro-to-isrs-an)
+- added date of compilation
+- added patch for interrupt routine (ICACHE_RAM_ATTR) from [here](https://stackoverflow.com/questions/58113937/esp8266-arduino-why-is-it-necessary-to-add-the-icache-ram-attr-macro-to-isrs-an)
+
+### v2.2 (PeMue):
+- changed from SPIFFS to LittleFS
+- **CAUTION:** Please erease complete ESP8266 chip before flashing new software.
 
 ## Flashing the firmware
 1. Install the Arduino IDE plus the 8266 package following [these instructions](https://github.com/esp8266/Arduino#installing-with-boards-manager)

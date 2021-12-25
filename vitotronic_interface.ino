@@ -11,12 +11,12 @@
  * - GPIO0 for 1-wire
  * - GPIO2 for debug messages
  * - GPIO12 for config
- * - 512k RAM/64k SPIFFS
+ * - 512k RAM/64k FS
  * Ver. 2.x:
  * - GPIO0 for 1-wire
  * - GPIO2 for config (or for debug messages alternatively)
- * - 512k RAM/64k SPIFFS (in case of blue ESP8266 ESP01 modules)
- * - 1M RAM/64 kSPIFFS (in case of black ESP8266 ESP01 modules)
+ * - 512k RAM/64k FS (in case of blue ESP8266 ESP01 modules)
+ * - 1M RAM/64k FS (in case of black ESP8266 ESP01 modules)
  * 
  * Software
  * version 1.0 - renemt see https://github.com/rene-mt/vitotronic-interface-8266/blob/master/vitotronic-interface-8266.ino
@@ -46,16 +46,17 @@
  *   Arduino IDE version: ARDUINO (decimal)
  *   from LaCrosse Gateway: ESP.getCoreVersion(); ESP.getSdkVersion();
  * - add solution for ESP8266 library > v2.5.0 acc. https://forum.fhem.de/index.php/topic,51583.msg1170834.html#msg1170834 and
- *   https://stackoverflow.com/questions/58113937/esp8266-arduino-why-is-it-necessary-to-add-the-icache-ram-attr-macro-to-isrs-an
- *   (solution and explanation see bottom)
- * changes for future versions:
- *   Consider change to LittleFS or other filesystems, as SPIFFS has been deprecated.
+ *   https://stackoverflow.com/questions/58113937/esp8266-arduino-why-is-it-necessary-to-add-the-icache-ram-attr-macro-to-isrs-an or
+ *   (solution and explanation see bottom) or
+ *   https://dillinger-engineering.de/tag/icache_ram_attr/
+ * version 2.1 - Peter Mühlbeyer
+ * - change to LittleFS (SPIFFS has been deprecated)
  */
 //- -------------------------------------------------------------------------------------------------
 
 // import required libraries, ESP8266 libraries >2.1.0 are required
+#include <LittleFS.h>
 #include <ESP8266WiFi.h>
-#include <FS.h>
 #include <ESP8266WebServer.h>
 // for OTA update
 #include <ArduinoOTA.h>
@@ -68,7 +69,7 @@
 #define MAX_SENSORS 5                            // max. amount of sensors
 
 // define sketch version, variable for compiler information
-#define FIRMWARE_VER "2.1"
+#define FIRMWARE_VER "2.2"
 String compiler;
 
 // GPIO pin triggering setup interrupt for re-configuring the server
@@ -211,7 +212,7 @@ const char* _htmlSuccessTemplate =
       "</p>" \
       "<p>" \
         "<strong><em>IMPORTANT NOTICE:</em></strong><br/>" \
-        "Some of the ESP8266 mikrocontrollers, built into the adapter, need a hard reset to be able to connect to the new WiFi network. " \
+        "Some of the ESP8266 microcontrollers, built into the adapter, need a hard reset to be able to connect to the new WiFi network. " \
         "Therefore it is recommended to interrupt the power supply for a short time within the next 10 seconds.</strong>" \
       "</p>" \
     "</body>" \
@@ -305,8 +306,8 @@ void setup()
   yield();
 
   // try to read config file from internal file system
-  SPIFFS.begin();
-  File configFile = SPIFFS.open(_configFile, "r");
+  LittleFS.begin();
+  File configFile = LittleFS.open(_configFile, "r");
   if (configFile)
   {
     Serial1.println("Using existing WiFi config to connect");
@@ -321,7 +322,7 @@ void setup()
     {
       // reset & return to setup mode if minium configuration data is missing
       Serial1.println("Minimum configuration data is missing (ssid, port) - resetting to setup mode");
-      SPIFFS.remove(_configFile);
+      LittleFS.remove(_configFile);
 
       yield();
       ESP.reset();
@@ -392,7 +393,7 @@ void setup()
     {
       Serial1.printf("\n\nCould not connect to WiFi network '%s'.\n", ssid.c_str());
       Serial1.println("Deleting configuration and resetting ESP to return to configuration mode");
-      SPIFFS.remove(_configFile);
+      LittleFS.remove(_configFile);
       yield();
       ESP.reset();
     }
@@ -764,14 +765,14 @@ void handleUpdate()
 
   // check, if values are out of range, if not, correct them
   if (timeout.toInt() < 0) timeout = "0";
-  if (timeout.toInt() > 120) timeout = "120";
+  if (timeout.toInt() > 300) timeout = "300";
   if (interval.toInt() < 5) interval = "20";  // allow also 5 s time between 1-wire measurement for testing
   if (interval.toInt() > 3600) interval = "3600";
   
   // write configuration data to file
   Serial1.printf("Writing config to file '%s'", _configFile);
-  SPIFFS.begin();
-  File configFile = SPIFFS.open(_configFile, "w");
+  LittleFS.begin();
+  File configFile = LittleFS.open(_configFile, "w");
 
   configFile.println(ssid);
   configFile.println(password);
@@ -821,8 +822,8 @@ void setupInterrupt()
 {
   // if the setup button has been pushed delete the existing configuration and reset the ESP to enter setup mode again
   Serial1.println("Reset button pressed, deleting existing configuration");
-  SPIFFS.begin();
-  SPIFFS.remove(_configFile);
+  LittleFS.begin();
+  LittleFS.remove(_configFile);
   yield();
   ESP.reset();
 }
