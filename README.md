@@ -94,7 +94,7 @@ As long as the ESP of the adapter is not configured for connecting to a WiFi net
 * Connect to this network, using the password *"vitotronic"*.
 * In your web browser, go to http://192.168.4.1
 
-    ![picture](pic/vitotronic_interface_v2.3-pic01.png =480x)
+	<img src="pic/vitotronic_interface_v2.3-pic01.png" width="480">
 
 * Provide the required configuration information:
   * **SSID** of the WiFi network to connect to (mandatory)
