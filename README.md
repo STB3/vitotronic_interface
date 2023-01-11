@@ -44,32 +44,29 @@ Initial version by renemt.
 - changed from SPIFFS to LittleFS
 - **CAUTION:** Please erease complete ESP8266 chip before flashing new firmware.
 
+### v2.3 (STB3)
+ - Moved html pages to LittleFS to clearly divide between html and C++ code
+ - Adopted routines reading the html code previously from a variable
+ - now using PlaformIO/VSCode as IDE
+
+
 ## Flashing the firmware
-1. Install the Arduino IDE plus the 8266 package following [these instructions](https://github.com/esp8266/Arduino#installing-with-boards-manager)
-2. Install following Arduino libraries:
-   - [OneWire](https://github.com/PaulStoffregen/OneWire) (tested with v2.3.4)
-   - [DallasTemperature](https://github.com/milesburton/Arduino-Temperature-Control-Library) (tested with v3.9.0)
-3. Open, compile and upload the *vitotronic_interface.ino* sketch to your ESP8266, use following settings 
-
-   ![picture](pic/vitotronic_interface-pic01.jpg)
-
-   **or**
-
-4. Flash the precomiled binary from the releases directory.
-
-### Notes on compiling
-~~If you compile the software on your own, please use ESP8266 libary between [v2.4.1](https://github.com/esp8266/Arduino/releases/tag/2.4.1) and [v2.5.0](https://github.com/esp8266/Arduino/releases/tag/2.5.0).
-With library versions >v2.5.0 the ESP8266 will get into boot loop and does not create an access point.~~
-Tested Arduino IDE versions: v1.8.8 / v1.8.11 and v1.8.16.
+1. Install Visual Studio Code
+2. Install the PlatformIO toolbox
+3. Open the Folder. File/Open Folder...
+4. Select PlatformIO Logo on the left side of the IDE
+5. Be sure to have the right project (esp01_1m)
+6. Click Build
+7. Click Build Filesystem Image
+8. Upload
+9. Upload Filesystem Image
 
 ### Notes on flashing
 ESP8266 ESP-01 modules use memory modules from different memory manufactureres. Therefore the programming speed might be significantly different.
 Here an overview about possible memories and their flash speeds:
 
 `XTX  PN25F08`: QIO 115.200 baud  OK
-
 `XTX  PN25F08B`: **DOUT** 57.600 baud OK
-
 `T25S80`: QIO 57.600 OK
 
 In case of flashing does not seem possible or no access point is opened, DOUT and 57.600 baud should be used for flashing.
