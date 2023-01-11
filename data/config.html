@@ -1,0 +1,93 @@
+<html>
+
+<head>
+  <title>Vitotronic WiFi Interface</title>
+</head>
+
+<body>
+  <h2>Vitotronic WiFi Interface v%%ver</h2>
+  <h3>Setup</h3>
+  <form action="update" id="update" method="post">
+    <h4>WiFi Network Configuration Data</h4>
+    <div>Enter the SSID and the password of the router you want to connect.</div>
+    <h4>Static IP settings</h4>
+    <div>If you want to assing a static IP address fill out the following information. All addresses have to by given in
+      IPv4 format (xxx.xxx.xxx.xxx). <br />Leave the fields empty to rely on DHCP to obtain an IP address.</div>
+    <h4>Telnet Server Port</h4>
+    <div>The Vitotronic WiFi Interface will listen at this port for incoming telnet connections.</div>
+    <h4>UDP Server Port</h4>
+    <div>The 1-wire UDP port is fixed to: 12345</div>
+    <h4>Reconnect timeout</h4>
+    <div>The Vitotronic WiFi Interface will try to connect (timeout) sec. after the reboot of the router.</div>
+    <h4>1-wire interval</h4>
+    <div>In case of 1-wire temperature sensors are connected, send the temperatures every (interval) sec. (between 20
+      and 3600 s).</div>
+    <p>Fields marked by (*) are mandatory.</p>
+    <table border="1" style="border-collapse: collapse; width: 50%; height: 102px;">
+      <tbody>
+        <tr style="height: 21px;">
+          <td style="width: 20%; height: 21px;" colspan="2"><strong>WiFi Network Configuration Data</strong></td>
+        </tr>
+        <tr style="height: 21px;">
+          <td style="width: 20%; height: 21px;"><label for="ssid">SSID (*)</label></td>
+          <td style="width: 30%; height: 21px;"><input type="text" name="ssid" required="" /></td>
+        </tr>
+        <tr style="height: 21px;">
+          <td style="width: 20%; height: 21px;"><label for="password">Password (*)</label></td>
+          <td style="width: 30%; height: 21px;"><input type="password" name="password" required="" /></td>
+        </tr>
+        <tr style="height: 21px;">
+          <td style="width: 20%; height: 21px;" colspan="2"><strong>Static IP settings</strong></td>
+        </tr>
+        <tr style="height: 21px;">
+          <td style="width: 20%; height: 21px;"><label for="ip">Static IP</label></td>
+          <td style="width: 30%; height: 21px;"><input type="text" name="ip"
+              pattern="^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$" /></td>
+        </tr>
+        <tr>
+          <td style="width: 20%; height: 21px;"><label for="dns">DNS Server</label></td>
+          <td style="width: 30%; height: 21px;"><input type="text" name="dns"
+              pattern="^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$" /></td>
+        </tr>
+        <tr>
+          <td style="width: 20%; height: 21px;"><label for="gateway">Gateway</label></td>
+          <td style="width: 30%; height: 21px;"><input type="text" name="gateway"
+              pattern="^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$" /></td>
+        </tr>
+        <tr>
+          <td style="width: 20%; height: 21px;"><label for="subnet">Subnet mask</label></td>
+          <td style="width: 30%; height: 21px;"><input type="text" name="subnet"
+              pattern="^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$" /></td>
+        </tr>
+        <tr>
+          <td style="width: 20%;" colspan="2"><strong>Telnet server Port</strong></td>
+        </tr>
+        <tr>
+          <td style="width: 20%; height: 21px;">Port (*)</td>
+          <td style="width: 30%; height: 21px;"><input type="number" name="port" value="81" required="" /></td>
+        </tr>
+        <tr>
+          <td style="height: 21px;" colspan="2"><strong>Reconnect timeout</strong></td>
+        </tr>
+        <tr>
+          <td style="width: 20%; height: 21px;">Timeout (*)</td>
+          <td style="width: 20%; height: 21px;"><strong><input type="number" name="timeout" value="60"
+                required="" /></strong></td>
+        </tr>
+        <tr>
+          <td style="width: 20%; height: 21px;" colspan="2"><strong>1-wire interval (*)</strong></td>
+        </tr>
+        <tr>
+          <td style="width: 20%; height: 21px;">Interval</td>
+          <td style="width: 20%; height: 21px;"><input type="number" name="interval" value="360" required="" /></td>
+        </tr>
+      </tbody>
+    </table>
+    <p></p>
+    <div><button type="reset">Reset</button> <button type="submit">Submit</button></div>
+    <p></p>
+    <small>Compiled with %%compiler.</small>
+  </form>
+</body>
+
+</html>

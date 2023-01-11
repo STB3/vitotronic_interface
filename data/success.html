@@ -1,0 +1,76 @@
+<html>
+
+<head>
+  <title>Vitotronic WiFi Interface</title>
+</head>
+
+<body>
+
+  <h1>Vitotronic WiFi Interface v%%ver</h1>
+  <h2>Configuration saved</h2>
+  <p>The configuration has been successfully saved to the adapter:<br /><br /></p>
+  <table border="1" style="border-collapse: collapse; width: 50%; height: 102px;">
+    <tbody>
+      <tr style="height: 21px;">
+        <td style="width: 20%; height: 21px;" colspan="2"><strong>WiFi Network Configuration Data</strong></td>
+      </tr>
+      <tr style="height: 21px;">
+        <td style="width: 20%; height: 21px;"><label for="ssid">SSID  </label></td>
+        <td style="width: 30%; height: 21px;">%%ssid</td>
+      </tr>
+      <tr style="height: 21px;">
+        <td style="width: 20%; height: 21px;"><label for="password">Password  </label></td>
+        <td style="width: 30%; height: 21px;">%%password</td>
+      </tr>
+      <tr style="height: 21px;">
+        <td style="width: 20%; height: 21px;" colspan="2"><strong>Static IP settings</strong></td>
+      </tr>
+      <tr style="height: 21px;">
+        <td style="width: 20%; height: 21px;"><label for="ip">Static IP</label></td>
+        <td style="width: 30%; height: 21px;">%%ip</td>
+      </tr>
+      <tr>
+        <td style="width: 20%; height: 21px;"><label for="dns">DNS Server</label></td>
+        <td style="width: 30%; height: 21px;">%%dns</td>
+      </tr>
+      <tr>
+        <td style="width: 20%; height: 21px;"><label for="gateway">Gateway</label></td>
+        <td style="width: 30%; height: 21px;">%%gateway</td>
+      </tr>
+      <tr>
+        <td style="width: 20%; height: 21px;"><label for="subnet">Subnet mask</label></td>
+        <td style="width: 30%; height: 21px;">%%subnet</td>
+      </tr>
+      <tr>
+        <td style="width: 20%;" colspan="2"><strong>Telnet server Port</strong></td>
+      </tr>
+      <tr>
+        <td style="width: 20%; height: 21px;">Port  </td>
+        <td style="width: 30%; height: 21px;">%%port</td>
+      </tr>
+      <tr>
+        <td style="height: 21px;" colspan="2"><strong>Reconnect timeout</strong></td>
+      </tr>
+      <tr>
+        <td style="width: 20%; height: 21px;">Timeout  </td>
+        <td style="width: 20%; height: 21px;">%%timeout</td>
+      </tr>
+      <tr>
+        <td style="width: 20%; height: 21px;" colspan="2"><strong>1-wire interval  </strong></td>
+      </tr>
+      <tr>
+        <td style="width: 20%; height: 21px;">Interval</td>
+        <td style="width: 20%; height: 21px;">%%interval</td>
+      </tr>
+    </tbody>
+  </table>
+  <p><br />The adapter will reboot now and connect to the specified WiFi network. In case of a successful connection the
+    <em>vitotronic-interface</em> network will be gone. <br /><strong>If no connection is possible, e.g. because the
+      password is wrong or the network is not available, the adapter will return to setup mode again.</strong></p>
+  <p><strong><em>IMPORTANT NOTICE:</em></strong><br />Some of the ESP8266 microcontrollers, built into the adapter, need
+    a hard reset to be able to connect to the new WiFi network. Therefore it is recommended to interrupt the power
+    supply for a short time within the next 10 seconds.</p>
+
+</body>
+
+</html>
