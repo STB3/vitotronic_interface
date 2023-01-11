@@ -94,7 +94,7 @@ As long as the ESP of the adapter is not configured for connecting to a WiFi net
 * Connect to this network, using the password *"vitotronic"*.
 * In your web browser, go to http://192.168.4.1
 
-    ![picture](pic/vitotronic_interface_v2.1-pic01.jpg)
+    ![picture](pic/vitotronic_interface_v2.3-pic01.png)
 
 * Provide the required configuration information:
   * **SSID** of the WiFi network to connect to (mandatory)
@@ -109,7 +109,7 @@ As long as the ESP of the adapter is not configured for connecting to a WiFi net
   * The **1-wire interval** time (in s) when the 1-wire data will be sent (mandatory).
 * Press "Submit" afterwards. The adapter will save the configuration, restart and connect to the given WiFi network. Afterwards the server will be reachable in the network at the IP (DHCP or static) and specified port. The server's IP is also pingable.
 
-    ![picture](pic/vitotronic_interface_v2.1-pic02.jpg)
+    ![picture](pic/vitotronic_interface_v2.3-pic02.png)
 
 **Important notice:** Some ESP8266 modules need a "hard reset" to be able to connect to the new WiFi network. Therefore it is recommended to interrupt the power supply for a short time after the new configuration has been submitted. If the connection was successful, the *vitotronic-interface* network will be gone and the adapter should be pingable in the specified network.
 
