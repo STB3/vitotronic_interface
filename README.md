@@ -77,7 +77,7 @@ In case of flashing does not seem possible or no access point is opened, DOUT an
 3. Get the IP address of the *Optolink* Adapter, type in IP address and path to new firmware, port remains 8266
 4. Press Flash
 
-   ![picture](pic/vitotronic_interface_OTA-pic01.jpg)
+   <img src="pic/vitotronic_interface_OTA-pic01.jpg" width="480">
 
 5. In case the flashing procedure does not work, disconnect the *Optolink" adapter from power supply, reconnect and try again
 
