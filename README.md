@@ -12,7 +12,7 @@ ESP8266 WiFi to serial interface, built to connect to a Viessmann Vitotronic hea
  - GPIO0 for 1-wire (only from v2.1 onwards)
  - GPIO2 for config (or for debug messages alternatively)
  - 1M RAM/64k SPIFFS (in case of black ESP8266-ESP01 modules)
-### v3.x:
+### v3.x by STB3:
 - Button for reconfiguring
 - Split design base with ESP8266 and sattelite board for the optical connection
 
