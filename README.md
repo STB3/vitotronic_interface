@@ -12,6 +12,9 @@ ESP8266 WiFi to serial interface, built to connect to a Viessmann Vitotronic hea
  - GPIO0 for 1-wire (only from v2.1 onwards)
  - GPIO2 for config (or for debug messages alternatively)
  - 1M RAM/64k SPIFFS (in case of black ESP8266-ESP01 modules)
+### v3.x:
+- Button for reconfiguring
+- Split design base with ESP8266 and sattelite board for the optical connection
 
 ## Changelog firmware
 ### v1.0:
@@ -61,28 +64,6 @@ Initial version by renemt.
 8. Upload
 9. Upload Filesystem Image
 
-### Notes on flashing
-ESP8266 ESP-01 modules use memory modules from different memory manufactureres. Therefore the programming speed might be significantly different.
-Here an overview about possible memories and their flash speeds:
-
-`XTX  PN25F08`: QIO 115.200 baud  OK
-`XTX  PN25F08B`: **DOUT** 57.600 baud OK
-`T25S80`: QIO 57.600 OK
-
-In case of flashing does not seem possible or no access point is opened, DOUT and 57.600 baud should be used for flashing.
-
-## Flashing the firmware OTA (**O**ver **T**he **A**ir)
-1. Get flash tool from [here](https://1st.bitbumper.de/ota-firmware-update-tool-for-esp8266/) (Windows 64-bit necessary) and run it
-2. *Optolink* adapter needs to be configured, that it will be recognized in the local WLAN network
-3. Get the IP address of the *Optolink* Adapter, type in IP address and path to new firmware, port remains 8266
-4. Press Flash
-
-   <img src="pic/vitotronic_interface_OTA-pic01.jpg" width="480">
-
-5. In case the flashing procedure does not work, disconnect the *Optolink" adapter from power supply, reconnect and try again
-
-**Remark**: If you are flashing a firmware, which has a different layout of the configuration, configuration should be deleted during the first start (see below).
-
 ## Setting up the *Optolink* hardware
 * Wire up the ESP8266 and power supply.
 * Connect the *Optolink* to the heating, connect *IN/RX* with the ESP8266 *RX* line and *OUT/TX* with the ESP8266 *TX* line, as well as *VCC* and *GND* to 3.3V and Ground.
@@ -118,4 +99,5 @@ As long as the ESP of the adapter is not configured for connecting to a WiFi net
 **Important notice:** Some ESP8266 modules need a "hard reset" to be able to connect to the new WiFi network. Therefore it is recommended to interrupt the power supply for a short time after the new configuration has been submitted. If the connection was successful, the *vitotronic-interface* network will be gone and the adapter should be pingable in the specified network.
 
 ## Re-configuring the adapter
-To re-configure the adapter, connect *GPIO12* (hardware v1.x) (or *GPIO2* (hardware v2.x)) to *GND* for a short time (e.g. by a pushbutton). Thus, the existing configuration will be deleted and the adapter will enter setup mode again (see above).
+To re-configure the adapter, connect *GPIO2* (hardware v2.x) to *GND* for a short time (e.g. by a pushbutton). Thus, the existing configuration will be deleted and the adapter will enter setup mode again (see above).
+On STBs adapter use the built in button to reconfigure the adapter.
